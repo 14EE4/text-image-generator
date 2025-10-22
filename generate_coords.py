@@ -17,7 +17,7 @@ def is_nonwhite_pixel(px, alpha_thresh=10, white_thresh=240):
 def detect_glyphs_from_single_row(img, white_thresh=240, alpha_thresh=10, gap_tolerance=1, min_glyph_width=2):
     """
     Detect glyph bounding columns in a single-row sprite by scanning vertical whitespace.
-    Returns list of glyph dicts: { sx, w, sy, h } (sy/h derived from actual non-white rows).
+    Returns list of glyph dicts: { sx, w, sy, h } (sy set to 0, h = image height to avoid per-glyph y-offset)
     """
     w, h = img.size
     rgba = img.convert('RGBA')
@@ -62,25 +62,14 @@ def detect_glyphs_from_single_row(img, white_thresh=240, alpha_thresh=10, gap_to
         merged.append(cur)
         blocks = merged
 
-    # filter narrow noise blocks and compute vertical bounds for each glyph
+    # filter narrow noise blocks -- set sy=0 and use full image height to avoid per-glyph y offsets
     glyphs = []
     for b in blocks:
         width = b['end'] - b['start'] + 1
         if width < min_glyph_width:
             continue
-        # compute top/bottom non-white row within block
-        top = h; bottom = -1
-        for x in range(b['start'], b['end'] + 1):
-            for y in range(h):
-                r,g,bv,a = px[x,y]
-                a = 255 if a is None else a
-                if a >= alpha_thresh and not (r > white_thresh and g > white_thresh and bv > white_thresh):
-                    if y < top: top = y
-                    if y > bottom: bottom = y
-        if bottom < 0:
-            top = 0
-            bottom = h - 1
-        glyphs.append({'sx': b['start'], 'w': width, 'sy': top, 'h': bottom - top + 1})
+        # do NOT compute top/bottom; use sy = 0 and full image height
+        glyphs.append({'sx': b['start'], 'w': width, 'sy': 0, 'h': h})
 
     return glyphs
 
@@ -244,11 +233,11 @@ def map_order_to_coords(order, grid):
             if idx >= len(order):
                 break
             sx = start_x + c * cellW
-            sy = row['y']
+            # do NOT use row['y']; force sy = 0 to avoid per-row vertical offsets
             coords.append({
                 'char': order[idx],
                 'index': idx,
-                'sx': sx, 'sy': sy, 'w': cellW, 'h': cellH
+                'sx': sx, 'sy': 0, 'w': cellW, 'h': cellH
             })
             idx += 1
     return coords
