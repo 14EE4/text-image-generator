@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const spacing = 4;
             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
+            const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
             let desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
 
             const scales = [];
@@ -101,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const srcH = g ? (g.h || avgSrcH) : avgSrcH;
                 let s = Math.max(1, Math.floor(desiredGlyphH / srcH)); // integer scale
                 scales.push(s);
-                glyphWidths.push((g ? g.w : avgSrcH) * s);
+                glyphWidths.push((g ? g.w : avgSrcW) * s);
             }
 
             let totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newScale = Math.max(1, Math.floor(scales[i] * factor));
                     scales[i] = newScale;
                     const g = coordsMap[text[i]] || coordsMap[text[i].toUpperCase()] || coordsMap[text[i].toLowerCase()];
-                    glyphWidths[i] = (g ? g.w : avgSrcH) * newScale;
+                    glyphWidths[i] = (g ? g.w : avgSrcW) * newScale;
                 }
                 totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
             }
@@ -141,9 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const scale = scales[i] || 1;
 
-                // treat space as empty gap (advance x by computed glyph width)
+                // treat space as small gap (smaller than full glyph width)
                 if (ch === ' ') {
-                    x += glyphWidths[i] + spacing;
+                    // prefer a small fixed width or proportional small gap
+                    const smallGap = Math.max(2, Math.floor((avgSrcW || avgSrcH) * scale * 0.35));
+                    x += smallGap;
                     continue;
                 }
 
