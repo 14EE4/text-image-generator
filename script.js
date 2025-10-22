@@ -188,10 +188,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // update download link from same layout (will match screen)
             downloadLink.href = getTransparentDataURL(250);
-            downloadLink.download = 'text-glyphs.png';
-            downloadLink.style.display = 'inline';
-            downloadLink.textContent = '이미지 다운로드';
-            setStatus('Rendered (screen matches download) successfully');
+            // generate safe filename from rendered text
+            const rawName = (text || '').trim() || 'text-glyphs';
+            const safeName = rawName
+                .replace(/\s+/g, '_')                // spaces -> _
+                .replace(/[^A-Za-z0-9_\-\.]/g, '')   // remove unsafe chars
+                .slice(0, 64) || 'text-glyphs';      // limit length
+            downloadLink.download = safeName + '.png';
+             downloadLink.style.display = 'inline';
+             downloadLink.textContent = '이미지 다운로드';
+             setStatus('Rendered (screen matches download) successfully');
         } catch (err) {
             console.error('render error', err);
             setStatus('Render error: see console', true);
