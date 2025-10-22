@@ -1,9 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('script.js loaded');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const input = document.getElementById('textInput');
     const btn = document.getElementById('generateBtn');
     const downloadLink = document.getElementById('downloadLink');
+
+    // status banner (visible on page)
+    const status = document.createElement('div');
+    status.id = 'statusBanner';
+    status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
+    document.body.insertBefore(status, document.getElementById('canvas'));
+
+    function setStatus(msg, isError = false) {
+        status.textContent = msg;
+        status.style.color = isError ? '#a00' : '#080';
+        console.log('[STATUS]', msg);
+    }
 
     // resources (fixed: coords.json + english_old2.png)
     let coords = [];
@@ -13,26 +26,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const spriteImg = new Image();
 
     async function loadResources() {
-        // load coords.json
+        setStatus('Loading coords.json...');
         try {
             const res = await fetch(coordsPath);
-            if (!res.ok) throw new Error('coords.json not found');
+            if (!res.ok) throw new Error(`coords.json fetch failed: ${res.status} ${res.statusText}`);
             const payload = await res.json();
             coords = payload.coords || [];
             coordsMap = {};
-            for (const c of coords) coordsMap[c.char] = c;
+            for (const c of coords) {
+                if (c && c.char !== undefined) coordsMap[c.char] = c;
+            }
             console.log('Loaded coords:', coords.length);
+            setStatus(`coords.json loaded (${coords.length} entries)`);
         } catch (e) {
-            console.warn('coords.json load failed:', e.message);
+            console.error('coords.json load failed', e);
+            setStatus(`coords.json load failed: ${e.message}`, true);
             coords = [];
             coordsMap = {};
         }
 
-        // load sprite image
         return new Promise((resolve) => {
-            spriteImg.onload = () => resolve();
-            spriteImg.onerror = () => {
-                console.warn('sprite image not loaded:', spritePath);
+            spriteImg.onload = () => {
+                console.log('sprite loaded:', spritePath, spriteImg.naturalWidth, 'x', spriteImg.naturalHeight);
+                setStatus(`sprite loaded: ${spritePath} (${spriteImg.naturalWidth}x${spriteImg.naturalHeight})`);
+                resolve();
+            };
+            spriteImg.onerror = (ev) => {
+                console.warn('sprite image load error', spritePath, ev);
+                setStatus(`sprite load failed: ${spritePath}`, true);
                 resolve();
             };
             spriteImg.src = spritePath;
@@ -48,91 +69,77 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    // render text using sprite glyphs (no user size inputs)
     function renderUsingGlyphs(text) {
-        if (!coords || coords.length === 0 || !spriteImg.complete) {
-            // fallback: simple text
-            const w = 800, h = 200;
-            setCanvasSize(w, h);
-            ctx.clearRect(0,0,w,h);
+        try {
+            console.log('renderUsingGlyphs()', { text, coordsLen: coords.length, spriteLoaded: spriteImg.complete && spriteImg.naturalWidth > 0 });
+            if (!coords || coords.length === 0 || !spriteImg.complete || spriteImg.naturalWidth === 0) {
+                setStatus('Fallback: drawing simple text (missing coords or sprite)', true);
+                const w = 800, h = 200;
+                setCanvasSize(w, h);
+                ctx.clearRect(0,0,w,h);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0,0,w,h);
+                ctx.fillStyle = '#000';
+                ctx.font = `${Math.floor(h*0.3)}px serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, w/2, h/2);
+                downloadLink.style.display = 'none';
+                return;
+            }
+
+            const srcW = coords[0].w || 16;
+            const srcH = coords[0].h || 16;
+            const spacing = 4;
+            const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
+            let scale = 2;
+            let glyphW = Math.round(srcW * scale);
+            let glyphH = Math.round(srcH * scale);
+            let totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
+            if (totalW > maxCanvasWidth) {
+                const avail = maxCanvasWidth - 20 - Math.max(0, text.length - 1) * spacing;
+                scale = Math.max(1, avail / (text.length * srcW));
+                glyphW = Math.max(1, Math.round(srcW * scale));
+                glyphH = Math.max(1, Math.round(srcH * scale));
+                totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
+            }
+            const padding = 10;
+            const canvasW = totalW;
+            const canvasH = glyphH + padding * 2;
+            setCanvasSize(canvasW, canvasH);
+            ctx.clearRect(0,0,canvasW,canvasH);
             ctx.fillStyle = '#fff';
-            ctx.fillRect(0,0,w,h);
-            ctx.fillStyle = '#000';
-            ctx.font = `${Math.floor(h*0.3)}px serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, w/2, h/2);
-            downloadLink.style.display = 'none';
-            return;
-        }
+            ctx.fillRect(0,0,canvasW,canvasH);
 
-        // use first coord as base glyph size
-        const srcW = coords[0].w || 16;
-        const srcH = coords[0].h || 16;
-        const spacing = 4;
+            let x = Math.round((canvasW - (text.length * glyphW + Math.max(0, text.length - 1) * spacing)) / 2);
+            const y = Math.round((canvasH - glyphH) / 2);
 
-        // desired maximum canvas width
-        const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
-        // compute scale so text fits within maxCanvasWidth
-        // initial scale = 2
-        let scale = 2;
-        let glyphW = Math.round(srcW * scale);
-        let glyphH = Math.round(srcH * scale);
-        let totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20; // padding 20
-
-        if (totalW > maxCanvasWidth) {
-            // recompute scale to fit
-            const avail = maxCanvasWidth - 20 - Math.max(0, text.length - 1) * spacing;
-            scale = Math.max(1, avail / (text.length * srcW));
-            glyphW = Math.max(1, Math.round(srcW * scale));
-            glyphH = Math.max(1, Math.round(srcH * scale));
-            totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
-        }
-
-        const padding = 10;
-        const canvasW = totalW;
-        const canvasH = glyphH + padding * 2;
-
-        setCanvasSize(canvasW, canvasH);
-        ctx.clearRect(0,0,canvasW,canvasH);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0,0,canvasW,canvasH);
-
-        let x = Math.round((canvasW - (text.length * glyphW + Math.max(0, text.length - 1) * spacing)) / 2);
-        const y = Math.round((canvasH - glyphH) / 2);
-
-        // draw each glyph from sprite (no dotizing)
-        for (let i = 0; i < text.length; i++) {
-            const ch = text[i];
-            const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-            if (!g) {
-                // placeholder for missing glyph
-                ctx.fillStyle = '#ddd';
-                ctx.fillRect(x, y, glyphW, glyphH);
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                if (!g) {
+                    ctx.fillStyle = '#ddd';
+                    ctx.fillRect(x, y, glyphW, glyphH);
+                    x += glyphW + spacing;
+                    continue;
+                }
+                ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphW, glyphH);
                 x += glyphW + spacing;
-                continue;
             }
-            try {
-                ctx.drawImage(
-                    spriteImg,
-                    g.sx, g.sy, g.w, g.h,
-                    x, y, glyphW, glyphH
-                );
-            } catch (e) {
-                // if drawImage fails, draw placeholder
-                ctx.fillStyle = '#ddd';
-                ctx.fillRect(x, y, glyphW, glyphH);
-            }
-            x += glyphW + spacing;
-        }
 
-        downloadLink.href = canvas.toDataURL('image/png');
-        downloadLink.download = 'text-glyphs.png';
-        downloadLink.style.display = 'inline';
-        downloadLink.textContent = '이미지 다운로드';
+            downloadLink.href = canvas.toDataURL('image/png');
+            downloadLink.download = 'text-glyphs.png';
+            downloadLink.style.display = 'inline';
+            downloadLink.textContent = '이미지 다운로드';
+            setStatus('Rendered successfully');
+        } catch (err) {
+            console.error('render error', err);
+            setStatus('Render error: see console', true);
+        }
     }
 
     btn.addEventListener('click', () => {
+        console.log('Generate button clicked');
         const t = input.value.trim() || 'Sample';
         renderUsingGlyphs(t);
     });
