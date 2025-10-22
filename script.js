@@ -4,21 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('textInput');
     const btn = document.getElementById('generateBtn');
     const downloadLink = document.getElementById('downloadLink');
-    const widthInput = document.getElementById('canvasWidth');
-    const heightInput = document.getElementById('canvasHeight');
-    const dotSizeInput = document.getElementById('dotSize');
-    const dotSizeVal = document.getElementById('dotSizeVal');
 
-    dotSizeInput.addEventListener('input', () => dotSizeVal.textContent = dotSizeInput.value);
-
-    // load coords.json and sprite image
+    // resources (fixed: coords.json + english_old2.png)
     let coords = [];
     let coordsMap = {};
-    let spriteImg = new Image();
     const coordsPath = './coords.json';
     const spritePath = './english_old2.png';
+    const spriteImg = new Image();
 
     async function loadResources() {
+        // load coords.json
         try {
             const res = await fetch(coordsPath);
             if (!res.ok) throw new Error('coords.json not found');
@@ -33,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             coordsMap = {};
         }
 
+        // load sprite image
         return new Promise((resolve) => {
             spriteImg.onload = () => resolve();
             spriteImg.onerror = () => {
@@ -52,90 +48,82 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    // render using glyph bitmaps (with optional dotization)
-    function renderUsingGlyphs(text, dotSize = 0) {
-        const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
-        const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
-        setCanvasSize(w, h);
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, w, h);
-
+    // render text using sprite glyphs (no user size inputs)
+    function renderUsingGlyphs(text) {
         if (!coords || coords.length === 0 || !spriteImg.complete) {
+            // fallback: simple text
+            const w = 800, h = 200;
+            setCanvasSize(w, h);
+            ctx.clearRect(0,0,w,h);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0,0,w,h);
             ctx.fillStyle = '#000';
-            ctx.font = `${Math.floor(h*0.6)}px serif`;
+            ctx.font = `${Math.floor(h*0.3)}px serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(text, w/2, h/2);
+            downloadLink.style.display = 'none';
             return;
         }
 
-        // decide glyph target size (height = 60% canvas height)
-        const glyphTargetH = Math.floor(h * 0.6);
-        // use first coord height as source glyph height if available
-        const srcH = coords[0] && coords[0].h ? coords[0].h : glyphTargetH;
-        const scale = glyphTargetH / srcH;
-        const glyphTargetW = Math.round((coords[0] && coords[0].w ? coords[0].w : glyphTargetH) * scale);
-
-        // total width for fixed-width layout
+        // use first coord as base glyph size
+        const srcW = coords[0].w || 16;
+        const srcH = coords[0].h || 16;
         const spacing = 4;
-        const totalW = text.length * glyphTargetW + Math.max(0, text.length - 1) * spacing;
-        let x = Math.round((w - totalW) / 2);
-        const y = Math.round((h - glyphTargetH) / 2);
 
-        // offscreen canvas for sampling glyph pixels when dotSize > 0
-        const off = document.createElement('canvas');
-        off.width = Math.round(glyphTargetW);
-        off.height = Math.round(glyphTargetH);
-        const offCtx = off.getContext('2d');
+        // desired maximum canvas width
+        const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
+        // compute scale so text fits within maxCanvasWidth
+        // initial scale = 2
+        let scale = 2;
+        let glyphW = Math.round(srcW * scale);
+        let glyphH = Math.round(srcH * scale);
+        let totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20; // padding 20
 
+        if (totalW > maxCanvasWidth) {
+            // recompute scale to fit
+            const avail = maxCanvasWidth - 20 - Math.max(0, text.length - 1) * spacing;
+            scale = Math.max(1, avail / (text.length * srcW));
+            glyphW = Math.max(1, Math.round(srcW * scale));
+            glyphH = Math.max(1, Math.round(srcH * scale));
+            totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
+        }
+
+        const padding = 10;
+        const canvasW = totalW;
+        const canvasH = glyphH + padding * 2;
+
+        setCanvasSize(canvasW, canvasH);
+        ctx.clearRect(0,0,canvasW,canvasH);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0,0,canvasW,canvasH);
+
+        let x = Math.round((canvasW - (text.length * glyphW + Math.max(0, text.length - 1) * spacing)) / 2);
+        const y = Math.round((canvasH - glyphH) / 2);
+
+        // draw each glyph from sprite (no dotizing)
         for (let i = 0; i < text.length; i++) {
             const ch = text[i];
             const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
             if (!g) {
-                // placeholder box
+                // placeholder for missing glyph
                 ctx.fillStyle = '#ddd';
-                ctx.fillRect(x, y, glyphTargetW, glyphTargetH);
-                x += glyphTargetW + spacing;
+                ctx.fillRect(x, y, glyphW, glyphH);
+                x += glyphW + spacing;
                 continue;
             }
-
-            if (dotSize > 1) {
-                // draw glyph from sprite into offscreen at target size, then dotize
-                off.width = glyphTargetW;
-                off.height = glyphTargetH;
-                offCtx.clearRect(0,0,off.width,off.height);
-                try {
-                    offCtx.drawImage(
-                        spriteImg,
-                        g.sx, g.sy, g.w, g.h,
-                        0, 0, off.width, off.height
-                    );
-                    const imgData = offCtx.getImageData(0,0,off.width,off.height).data;
-                    const radius = Math.max(0.5, dotSize/2*0.9);
-                    for (let yy = 0; yy < off.height; yy += dotSize) {
-                        for (let xx = 0; xx < off.width; xx += dotSize) {
-                            const sx = Math.min(off.width-1, xx + Math.floor(dotSize/2));
-                            const sy = Math.min(off.height-1, yy + Math.floor(dotSize/2));
-                            const idx = (sy * off.width + sx) * 4;
-                            const alpha = imgData[idx+3];
-                            if (alpha > 50) {
-                                const r = imgData[idx], gcol = imgData[idx+1], b = imgData[idx+2];
-                                ctx.fillStyle = `rgb(${r},${gcol},${b})`;
-                                ctx.beginPath();
-                                ctx.arc(x + xx + dotSize/2, y + yy + dotSize/2, radius, 0, Math.PI*2);
-                                ctx.fill();
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // fallback draw image normally
-                    ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphTargetW, glyphTargetH);
-                }
-            } else {
-                ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphTargetW, glyphTargetH);
+            try {
+                ctx.drawImage(
+                    spriteImg,
+                    g.sx, g.sy, g.w, g.h,
+                    x, y, glyphW, glyphH
+                );
+            } catch (e) {
+                // if drawImage fails, draw placeholder
+                ctx.fillStyle = '#ddd';
+                ctx.fillRect(x, y, glyphW, glyphH);
             }
-            x += glyphTargetW + spacing;
+            x += glyphW + spacing;
         }
 
         downloadLink.href = canvas.toDataURL('image/png');
@@ -146,13 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btn.addEventListener('click', () => {
         const t = input.value.trim() || 'Sample';
-        const dot = parseInt(dotSizeInput.value, 10) || 0;
-        renderUsingGlyphs(t, dot);
+        renderUsingGlyphs(t);
     });
 
-    // initial load
+    // initial load & render
     loadResources().then(() => {
         const t = input.value.trim() || 'Sample';
-        renderUsingGlyphs(t, parseInt(dotSizeInput.value,10) || 0);
+        renderUsingGlyphs(t);
     });
 });

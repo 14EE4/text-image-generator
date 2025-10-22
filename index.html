@@ -3,40 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <title>텍스트 이미지 변환기</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet">
     <style>
-        
-        body { text-align: center; font-family: 'UnifrakturMaguntia', serif; padding: 20px; }
-        h1 { margin-bottom: 16px; font-family: 'UnifrakturMaguntia', serif; }
-        input, select { padding: 6px; margin: 6px; }
+        body { text-align: center; font-family: sans-serif; padding: 20px; }
+        h1 { margin-bottom: 16px; }
+        input { padding: 6px; margin: 6px; width: 300px; }
         button { padding: 8px 12px; cursor: pointer; }
-        #canvas { border: 1px solid #ccc; margin-top: 12px; background:#fff; }
+        #canvas { border: 1px solid #ccc; margin-top: 12px; background:#fff; display:block; margin-left:auto; margin-right:auto; }
         #downloadLink { display: block; margin-top: 12px; font-size: 1.0em; }
         .controls { margin-bottom: 10px; }
-        .inline { display:inline-block; vertical-align:middle; }
     </style>
 </head>
 <body>
-    <h1>고딕체 텍스트 이미지 생성기 (UnifrakturMaguntia)</h1>
+    <h1>텍스트 이미지 (english_old2.png)</h1>
 
     <div class="controls">
-        <input type="text" id="textInput" placeholder="텍스트를 입력하세요..." value="Sample">
-        <button id="generateBtn">이미지 생성 (도트)</button>
-    </div>
-
-    <div class="controls">
-        <label class="inline">캔버스 가로:
-            <input type="number" id="canvasWidth" value="800" min="50" style="width:80px">
-        </label>
-        <label class="inline">세로:
-            <input type="number" id="canvasHeight" value="200" min="50" style="width:80px">
-        </label>
-        <label class="inline">도트 크기:
-            <input type="range" id="dotSize" min="2" max="40" value="8">
-            <span id="dotSizeVal">8</span>px
-        </label>
+        <input type="text" id="textInput" placeholder="텍스트를 입력하세요..." value="HELLO">
+        <button id="generateBtn">생성</button>
     </div>
 
     <canvas id="canvas" width="800" height="200"></canvas>
