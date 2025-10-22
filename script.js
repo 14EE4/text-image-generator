@@ -239,61 +239,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getTransparentDataURL(threshold = 250) {
+        // helper: get selected tint color (if any)
+        const selHex = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : null);
+        const selRgb = selHex ? hexToRgb(selHex) : null;
+        const colorTolerance = 8; // 허용 오차 (픽셀/선택색 비교)
+
+        function closeToSelected(r,g,b) {
+            if (!selRgb) return false;
+            return Math.abs(r - selRgb.r) <= colorTolerance &&
+                   Math.abs(g - selRgb.g) <= colorTolerance &&
+                   Math.abs(b - selRgb.b) <= colorTolerance;
+        }
+
         if (lastRenderLayout && lastRenderLayout.layout && lastRenderLayout.layout.length) {
             const layout = lastRenderLayout.layout;
             const visualGap = lastRenderLayout.visualGap || 0;
-            // compute width/height
-            let totalW = 0; let maxH = 0;
+            // compute total source width and max height (including visual gaps)
+            let totalW = 0;
+            let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
                 if (item.srcH) maxH = Math.max(maxH, item.srcH);
             }
             if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
-            if (totalW <= 0 || maxH <= 0) return canvas.toDataURL('image/png');
+            if (totalW > 0 && maxH > 0) {
+                const tmp = document.createElement('canvas');
+                tmp.width = totalW;
+                tmp.height = maxH;
+                const tctx = tmp.getContext('2d');
+                tctx.imageSmoothingEnabled = false;
 
-            const tmp = document.createElement('canvas');
-            tmp.width = totalW; tmp.height = maxH;
-            const tctx = tmp.getContext('2d');
-            tctx.imageSmoothingEnabled = false;
-
-            let x = 0;
-            const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
-            for (let idx = 0; idx < layout.length; idx++) {
-                const item = layout[idx];
-                if (item.type === 'glyph') {
-                    const g = item.g;
-                    // tint glyph into tintOff then blit
-                    tintOff.width = g.w; tintOff.height = g.h;
-                    tintOffCtx.clearRect(0,0,g.w,g.h);
-                    tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
-                    const img = tintOffCtx.getImageData(0,0,g.w,g.h);
-                    const d = img.data;
-                    const rgb = hexToRgb(color);
-                    for (let pi = 0; pi < d.length; pi += 4) {
-                        if (d[pi+3] === 0) continue;
-                        d[pi] = rgb.r; d[pi+1] = rgb.g; d[pi+2] = rgb.b;
+                let x = 0;
+                const color = selHex || '#000000';
+                for (let idx = 0; idx < layout.length; idx++) {
+                    const item = layout[idx];
+                    if (item.type === 'glyph') {
+                        const g = item.g;
+                        // tint glyph into tintOff then blit
+                        tintOff.width = g.w; tintOff.height = g.h;
+                        tintOffCtx.clearRect(0,0,g.w,g.h);
+                        tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
+                        const img = tintOffCtx.getImageData(0,0,g.w,g.h);
+                        const d = img.data;
+                        const rgb = hexToRgb(color);
+                        for (let pi = 0; pi < d.length; pi += 4) {
+                            if (d[pi+3] === 0) continue;
+                            d[pi] = rgb.r; d[pi+1] = rgb.g; d[pi+2] = rgb.b;
+                        }
+                        tintOffCtx.putImageData(img, 0, 0);
+                        tctx.drawImage(tintOff, 0, 0, g.w, g.h, x, 0, g.w, g.h);
+                        x += g.w;
+                    } else {
+                        x += item.srcW || 0;
                     }
-                    tintOffCtx.putImageData(img, 0, 0);
-                    tctx.drawImage(tintOff, 0, 0, g.w, g.h, x, 0, g.w, g.h);
-                    x += g.w;
-                } else {
-                    x += item.srcW || 0;
+                    if (idx < layout.length - 1) x += visualGap;
                 }
-                if (idx < layout.length - 1) x += visualGap;
-            }
 
-            // white->transparent
-            const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
-            const dAll = imgAll.data;
-            for (let i = 0; i < dAll.length; i += 4) {
-                const r = dAll[i], g = dAll[i+1], b = dAll[i+2], a = dAll[i+3];
-                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) dAll[i+3] = 0;
+                // white->transparent but skip pixels that match selected tint color
+                const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
+                const dAll = imgAll.data;
+                for (let i = 0; i < dAll.length; i += 4) {
+                    const r = dAll[i], g = dAll[i+1], b = dAll[i+2], a = dAll[i+3];
+                    if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
+                        if (!closeToSelected(r,g,b)) dAll[i+3] = 0;
+                    }
+                }
+                tctx.putImageData(imgAll, 0, 0);
+                return tmp.toDataURL('image/png');
             }
-            tctx.putImageData(imgAll, 0, 0);
-            return tmp.toDataURL('image/png');
         }
 
-        // fallback: export visible canvas (CSS size)
+        // Fallback: export visible canvas (CSS size), same protection applied
         try {
             const rect = canvas.getBoundingClientRect();
             const outW = Math.max(1, Math.round(rect.width));
@@ -307,7 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const d = img.data;
             for (let i = 0; i < d.length; i += 4) {
                 const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) d[i+3] = 0;
+                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
+                    if (!closeToSelected(r,g,b)) d[i+3] = 0;
+                }
             }
             tctx.putImageData(img,0,0);
             return tmp.toDataURL('image/png');
