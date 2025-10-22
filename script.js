@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // restore smoothing default
             ctx.imageSmoothingEnabled = true;
 
-            downloadLink.href = canvas.toDataURL('image/png');
+            downloadLink.href = getTransparentDataURL(250); // threshold 0-255, 조정 가능
             downloadLink.download = 'text-glyphs.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
@@ -217,4 +217,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const t = input.value.trim() || 'Sample';
         renderUsingGlyphs(t);
     });
+
+    function getTransparentDataURL(threshold = 250) {
+        // use canvas device pixels
+        const w = canvas.width, h = canvas.height;
+        const tmp = document.createElement('canvas');
+        tmp.width = w;
+        tmp.height = h;
+        const tctx = tmp.getContext('2d');
+        tctx.drawImage(canvas, 0, 0);
+        const img = tctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+            if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
+                d[i + 3] = 0;
+            }
+        }
+        tctx.putImageData(img, 0, 0);
+        return tmp.toDataURL('image/png');
+    }
 });
