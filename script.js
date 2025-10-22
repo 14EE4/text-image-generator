@@ -140,7 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const scale = scales[i] || 1;
+
+                // treat space as empty gap (advance x by computed glyph width)
+                if (ch === ' ') {
+                    x += glyphWidths[i] + spacing;
+                    continue;
+                }
+
                 if (!g) {
+                    // unknown char -> keep previous behavior or use gap
                     ctx.fillStyle = '#ddd';
                     ctx.fillRect(x, y, Math.max(4,glyphWidths[i]), canvasH - padding*2);
                     x += glyphWidths[i] + spacing;
