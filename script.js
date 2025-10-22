@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const scales = [];
             const glyphWidths = [];
+            // define desiredGlyphH (was missing) — target glyph height in CSS pixels
+            const desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
