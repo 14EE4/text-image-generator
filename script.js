@@ -6,6 +6,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('generateBtn');
     const downloadLink = document.getElementById('downloadLink');
 
+    // controls (letter spacing visual, space width for export)
+    const letterSpacingInput = document.getElementById('letterSpacing');
+    const letterSpacingVal = document.getElementById('letterSpacingVal');
+    const spaceWidthInput = document.getElementById('spaceWidth');
+    const spaceWidthVal = document.getElementById('spaceWidthVal');
+
+    // initialize displays if elements exist
+    if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
+    if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+
+    // re-render when sliders change
+    if (letterSpacingInput) {
+        letterSpacingInput.addEventListener('input', () => {
+            if (letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
+            const t = input.value.trim() || 'Sample';
+            renderUsingGlyphs(t);
+        });
+    }
+    if (spaceWidthInput) {
+        spaceWidthInput.addEventListener('input', () => {
+            if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+            const t = input.value.trim() || 'Sample';
+            renderUsingGlyphs(t);
+        });
+    }
+
     // status banner (visible on page)
     const status = document.createElement('div');
     status.id = 'statusBanner';
@@ -91,42 +117,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const spacing = 4;
-            const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
-            const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
-            // Build layout info for export in source-pixel units
-            const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-            // export: reserve full average glyph width for spaces (so exported 1:1 image keeps spacing)
-            const spaceSrcWidth = avgSrcW;
-            const layout = [];
-            for (let i = 0; i < text.length; i++) {
-                const ch = text[i];
-                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                if (ch === ' ') {
+            // visual inter-letter spacing (CSS pixels)
+            const spacing = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
+             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
+             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
+             // Build layout info for export in source-pixel units
+             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
+             // export: reserve space width from control (source-pixel units)
+             const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value, 10) : avgSrcW;
+             const layout = [];
+             for (let i = 0; i < text.length; i++) {
+                 const ch = text[i];
+                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                 if (ch === ' ') {
                     layout.push({ type: 'space', srcW: spaceSrcWidth });
-                } else if (!g) {
-                    // unknown -> reserve avg width
-                    layout.push({ type: 'empty', srcW: avgSrcW });
-                } else {
-                    layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
-                }
-            }
-            // store for export
-            lastRenderLayout = { layout: layout };
-
-            const scales = [];
-            const glyphWidths = [];
-            // define desiredGlyphH (was missing) — target glyph height in CSS pixels
-            const desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
-            for (let i = 0; i < text.length; i++) {
+                 } else if (!g) {
+                     // unknown -> reserve avg width
+                     layout.push({ type: 'empty', srcW: avgSrcW });
+                 } else {
+                     layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
+                 }
+             }
+             // store for export
+             lastRenderLayout = { layout: layout };
+ 
+             const scales = [];
+             const glyphWidths = [];
+             // define desiredGlyphH (was missing) — target glyph height in CSS pixels
+             const desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
+             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const srcH = g ? (g.h || avgSrcH) : avgSrcH;
                 let s = Math.max(1, Math.floor(desiredGlyphH / srcH)); // integer scale
                 scales.push(s);
                 glyphWidths.push((g ? g.w : avgSrcW) * s);
-            }
-
+             }
+ 
             let totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
             if (totalW > maxCanvasWidth) {
                 const factor = maxCanvasWidth / totalW;
@@ -164,9 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const scale = scales[i] || 1;
 
-                // treat space as a small visual gap (1px) while export reserves avgSrcW
+                // treat space as a small visual gap (letter spacing independent) while export reserves spaceSrcWidth
                 if (ch === ' ') {
-                    const smallGap = 1;
+                    // use the same small visual gap as letter spacing (so letters visually align)
+                    const smallGap = spacing;
                     x += smallGap;
                     continue;
                 }

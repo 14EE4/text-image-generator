@@ -19,6 +19,19 @@
     <div class="controls">
         <input type="text" id="textInput" placeholder="텍스트를 입력하세요...">
         <button id="generateBtn">생성</button>
+
+        <!-- 글자간격 / 공백 너비 컨트롤 -->
+        <div style="margin-top:8px; display:inline-block; text-align:left;">
+            <label style="font-size:13px; margin-right:8px;">
+                글자간격: <strong id="letterSpacingVal">1</strong>px
+            </label>
+            <input id="letterSpacing" type="range" min="0" max="10" value="1" style="vertical-align:middle;">
+            <br>
+            <label style="font-size:13px; margin-right:8px;">
+                공백 너비(export): <strong id="spaceWidthVal">8</strong>px
+            </label>
+            <input id="spaceWidth" type="range" min="0" max="50" value="8" style="vertical-align:middle;">
+        </div>
     </div>
 
     <canvas id="canvas" width="800" height="200"></canvas>
