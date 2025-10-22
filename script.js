@@ -106,8 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const w = 800, h = 200;
                 setCanvasSize(w, h);
                 ctx.clearRect(0,0,w,h);
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(0,0,w,h);
                 ctx.fillStyle = '#000';
                 ctx.font = `${Math.floor(h*0.3)}px serif`;
                 ctx.textAlign = 'center';
@@ -117,130 +115,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // visual inter-letter spacing (CSS pixels)
-            const spacing = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
-             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
-             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
-             // Build layout info for export in source-pixel units
-             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-             // export: reserve space width from control (source-pixel units)
-             const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value, 10) : avgSrcW;
-             const layout = [];
-             for (let i = 0; i < text.length; i++) {
-                 const ch = text[i];
-                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                 if (ch === ' ') {
-                    layout.push({ type: 'space', srcW: spaceSrcWidth });
-                 } else if (!g) {
-                     // unknown -> reserve avg width
-                     layout.push({ type: 'empty', srcW: avgSrcW });
-                 } else {
-                     layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
-                 }
-             }
-             // store for export
-             lastRenderLayout = { layout: layout };
- 
-             const scales = [];
-             const glyphWidths = [];
-             // define desiredGlyphH (was missing) — target glyph height in CSS pixels
-             const desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
-             for (let i = 0; i < text.length; i++) {
-                const ch = text[i];
-                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                const srcH = g ? (g.h || avgSrcH) : avgSrcH;
-                let s = Math.max(1, Math.floor(desiredGlyphH / srcH)); // integer scale
-                scales.push(s);
-                glyphWidths.push((g ? g.w : avgSrcW) * s);
-             }
- 
-            let totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
-            if (totalW > maxCanvasWidth) {
-                const factor = maxCanvasWidth / totalW;
-                for (let i = 0; i < scales.length; i++) {
-                    const newScale = Math.max(1, Math.floor(scales[i] * factor));
-                    scales[i] = newScale;
-                    const g = coordsMap[text[i]] || coordsMap[text[i].toUpperCase()] || coordsMap[text[i].toLowerCase()];
-                    glyphWidths[i] = (g ? g.w : avgSrcW) * newScale;
-                }
-                totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
-            }
-
-            const padding = 10;
-            const canvasW = Math.max(200, Math.round(totalW));
-            const maxGlyphH = Math.max(...glyphWidths.map((w,i)=> (coordsMap[text[i]] ? (coordsMap[text[i]].h||avgSrcH) * scales[i] : avgSrcH*scales[i])));
-            const canvasH = Math.max(50, Math.round(maxGlyphH + padding * 2));
-            setCanvasSize(canvasW, canvasH);
-            ctx.clearRect(0,0,canvasW,canvasH);
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0,0,canvasW,canvasH);
-
-            let x = Math.round((canvasW - (glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1)*spacing)) / 2);
-            const y = padding;
-
-            // offscreen canvas for copying native glyph pixels
-            const off = document.createElement('canvas');
-            const offCtx = off.getContext('2d');
-
-            // ensure nearest-neighbor when scaling
-            offCtx.imageSmoothingEnabled = false;
-            ctx.imageSmoothingEnabled = false;
-
+            // Build layout info for export in source-pixel units (same as download)
+            const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
+            const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value, 10) : avgSrcW;
+            const layout = [];
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                const scale = scales[i] || 1;
-
-                // treat space as a small visual gap (letter spacing independent) while export reserves spaceSrcWidth
                 if (ch === ' ') {
-                    // use the same small visual gap as letter spacing (so letters visually align)
-                    const smallGap = spacing;
-                    x += smallGap;
-                    continue;
+                    layout.push({ type: 'space', srcW: spaceSrcWidth });
+                } else if (!g) {
+                    layout.push({ type: 'empty', srcW: avgSrcW });
+                } else {
+                    layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
                 }
+            }
+            lastRenderLayout = { layout: layout };
 
-                if (!g) {
-                    // unknown char -> placeholder gap
-                    ctx.fillStyle = '#ddd';
-                    ctx.fillRect(x, y, Math.max(4, glyphWidths[i]), canvasH - padding*2);
-                    x += glyphWidths[i] + spacing;
-                    continue;
+            // compute total source size and draw 1:1 to canvas so screen == download
+            let totalW = 0;
+            let maxH = 0;
+            for (const item of layout) {
+                totalW += item.srcW || 0;
+                if (item.srcH) maxH = Math.max(maxH, item.srcH);
+            }
+            if (totalW <= 0) totalW = 1;
+            if (maxH <= 0) maxH = 1;
+
+            // set canvas to source-pixel dimensions (visible CSS size will match these pixels)
+            setCanvasSize(totalW, maxH);
+            // clear to transparent so screen matches exported transparency
+            ctx.clearRect(0, 0, totalW, maxH);
+
+            ctx.imageSmoothingEnabled = false;
+
+            // draw each item 1:1 (no extra visual spacing)
+            let x = 0;
+            for (const item of layout) {
+                if (item.type === 'glyph') {
+                    const g = item.g;
+                    // draw glyph source pixels directly onto canvas at 1:1
+                    ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, 0, g.w, g.h);
+                    x += g.w;
+                } else {
+                    // space or empty: advance by srcW (leave transparent)
+                    x += item.srcW || 0;
                 }
-
-                const sW = g.w, sH = g.h;
-                off.width = sW;
-                off.height = sH;
-                offCtx.clearRect(0,0,sW,sH);
-                offCtx.drawImage(spriteImg, g.sx, g.sy, sW, sH, 0, 0, sW, sH);
-
-                // draw per-source-pixel as filled rects (preserve color; scale is integer)
-                const imgData = offCtx.getImageData(0, 0, sW, sH).data;
-                for (let py = 0; py < sH; py++) {
-                    for (let px = 0; px < sW; px++) {
-                        const idx = (py * sW + px) * 4;
-                        const a = imgData[idx + 3];
-                        if (a === 0) continue;
-                        const r = imgData[idx], gcol = imgData[idx + 1], b = imgData[idx + 2];
-                        const alpha = (a / 255);
-                        ctx.fillStyle = `rgba(${r},${gcol},${b},${alpha})`;
-                        const drawX = x + px * scale;
-                        const drawY = y + py * scale;
-                        ctx.fillRect(drawX, drawY, Math.max(1, scale), Math.max(1, scale));
-                    }
-                }
-
-                x += sW * scale + spacing;
             }
 
-            // restore smoothing default
-            ctx.imageSmoothingEnabled = true;
-
-            // after successful render, ensure download link uses export helper
-            downloadLink.href = getTransparentDataURL(250); // will use lastRenderLayout if available
+            // update download link from same layout (will match screen)
+            downloadLink.href = getTransparentDataURL(250);
             downloadLink.download = 'text-glyphs.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
-            setStatus('Rendered (original pixels) successfully');
+            setStatus('Rendered (screen matches download) successfully');
         } catch (err) {
             console.error('render error', err);
             setStatus('Render error: see console', true);
