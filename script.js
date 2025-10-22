@@ -88,17 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Use original glyph pixel grid to draw dots.
-            // srcW/srcH come from each coord (glyph native size)
             const spacing = 4;
-            // choose uniform pixel scale to keep dots visible; prefer integer scaling
-            // compute a target glyph height (visual) but then convert to integer pixel scale per glyph
             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
-            // compute tentative scale based on average glyph height
             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
-            let desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12)); // visual target
-            // will adjust per-glyph to integer scale
-            // Precompute glyph widths after integer scaling to compute total width
+            let desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
+
             const scales = [];
             const glyphWidths = [];
             for (let i = 0; i < text.length; i++) {
@@ -106,13 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const srcH = g ? (g.h || avgSrcH) : avgSrcH;
                 let s = Math.max(1, Math.floor(desiredGlyphH / srcH)); // integer scale
-                // if single glyph would be too wide, reduce scale
-                const wAfter = (g ? g.w : avgSrcH) * s;
                 scales.push(s);
-                glyphWidths.push(wAfter);
+                glyphWidths.push((g ? g.w : avgSrcH) * s);
             }
+
             let totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
-            // if exceed maxCanvasWidth, reduce all scales proportionally (keeping integer)
             if (totalW > maxCanvasWidth) {
                 const factor = maxCanvasWidth / totalW;
                 for (let i = 0; i < scales.length; i++) {
@@ -126,18 +118,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const padding = 10;
             const canvasW = Math.max(200, Math.round(totalW));
-            const canvasH = Math.max(50, Math.round(Math.max(...glyphWidths.map((w,i)=> (coordsMap[text[i]] ? (coordsMap[text[i]].h||avgSrcH) * scales[i] : avgSrcH*scales[i]))) + padding * 2));
+            const maxGlyphH = Math.max(...glyphWidths.map((w,i)=> (coordsMap[text[i]] ? (coordsMap[text[i]].h||avgSrcH) * scales[i] : avgSrcH*scales[i])));
+            const canvasH = Math.max(50, Math.round(maxGlyphH + padding * 2));
             setCanvasSize(canvasW, canvasH);
             ctx.clearRect(0,0,canvasW,canvasH);
             ctx.fillStyle = '#fff';
             ctx.fillRect(0,0,canvasW,canvasH);
 
             let x = Math.round((canvasW - (glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1)*spacing)) / 2);
-            const yTop = Math.round((canvasH - (canvasH - padding*2)) / 2); // baseline top padding not critical
+            const y = padding;
 
-            // offscreen canvas reused per glyph
+            // offscreen canvas for copying native glyph pixels
             const off = document.createElement('canvas');
             const offCtx = off.getContext('2d');
+
+            // ensure nearest-neighbor when scaling
+            offCtx.imageSmoothingEnabled = false;
+            ctx.imageSmoothingEnabled = false;
 
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
@@ -145,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const scale = scales[i] || 1;
                 if (!g) {
                     ctx.fillStyle = '#ddd';
-                    ctx.fillRect(x, padding, Math.max(4,glyphWidths[i]), canvasH - padding*2);
+                    ctx.fillRect(x, y, Math.max(4,glyphWidths[i]), canvasH - padding*2);
                     x += glyphWidths[i] + spacing;
                     continue;
                 }
@@ -155,35 +152,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 off.height = sH;
                 offCtx.clearRect(0,0,sW,sH);
                 offCtx.drawImage(spriteImg, g.sx, g.sy, sW, sH, 0, 0, sW, sH);
-                const img = offCtx.getImageData(0,0,sW,sH).data;
+                // draw scaled without smoothing to preserve pixel blocks
+                ctx.drawImage(off, 0, 0, sW, sH, x, y, sW * scale, sH * scale);
 
-                // draw a dot per source pixel (circle), positioned and scaled by integer 'scale'
-                const pixelSize = scale;
-                const radius = Math.max(0.2, pixelSize * 0.45);
-                for (let py = 0; py < sH; py++) {
-                    for (let px = 0; px < sW; px++) {
-                        const idx = (py * sW + px) * 4;
-                        const a = img[idx + 3];
-                        if (a > 50) {
-                            const r = img[idx], gcol = img[idx + 1], b = img[idx + 2];
-                            ctx.fillStyle = `rgb(${r},${gcol},${b})`;
-                            const cx = x + px * pixelSize + pixelSize / 2;
-                            const cy = padding + py * pixelSize + pixelSize / 2;
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
-                    }
-                }
-
-                x += sW * pixelSize + spacing;
+                x += sW * scale + spacing;
             }
 
+            // restore smoothing default
+            ctx.imageSmoothingEnabled = true;
+
             downloadLink.href = canvas.toDataURL('image/png');
-            downloadLink.download = 'text-glyphs-dot.png';
+            downloadLink.download = 'text-glyphs.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
-            setStatus('Rendered (original dots) successfully');
+            setStatus('Rendered (original pixels) successfully');
         } catch (err) {
             console.error('render error', err);
             setStatus('Render error: see console', true);
@@ -194,6 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Generate button clicked');
         const t = input.value.trim() || 'Sample';
         renderUsingGlyphs(t);
+    });
+
+    // Enter 키로 바로 변환
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const t = input.value.trim() || 'Sample';
+            renderUsingGlyphs(t);
+        }
     });
 
     // initial load & render
