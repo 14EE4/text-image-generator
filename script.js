@@ -96,7 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
             // Build layout info for export in source-pixel units
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-            const spaceSrcWidth = Math.max(1, Math.round(avgSrcW * 0.35));
+            // export: reserve full average glyph width for spaces (so exported 1:1 image keeps spacing)
+            const spaceSrcWidth = avgSrcW;
             const layout = [];
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
@@ -163,10 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
                 const scale = scales[i] || 1;
 
-                // treat space as small gap (smaller than full glyph width)
+                // treat space as a small visual gap (1px) while export reserves avgSrcW
                 if (ch === ' ') {
-                    // prefer a small fixed width or proportional small gap
-                    const smallGap = Math.max(2, Math.floor((avgSrcW || avgSrcH) * scale * 0.35));
+                    const smallGap = 1;
                     x += smallGap;
                     continue;
                 }
