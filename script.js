@@ -24,6 +24,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // color controls (picker + hex input)
+    const colorPicker = document.getElementById('colorPicker');
+    const colorHex = document.getElementById('colorHex');
+    function normalizeHex(v) {
+        if (!v) return '#000000';
+        v = v.trim();
+        if (!v) return '#000000';
+        if (v[0] !== '#') v = '#' + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+        return '#000000';
+    }
+    if (colorPicker && colorHex) {
+        colorPicker.addEventListener('input', () => {
+            colorHex.value = normalizeHex(colorPicker.value);
+            renderUsingGlyphs(input.value.trim() || 'Sample');
+        });
+        colorHex.addEventListener('input', () => {
+            const v = normalizeHex(colorHex.value);
+            colorHex.value = v;
+            try { colorPicker.value = v; } catch (e) {}
+            renderUsingGlyphs(input.value.trim() || 'Sample');
+        });
+    }
+
     // initialize displays if elements exist
     if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
     if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
@@ -110,6 +134,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // add near top of file-scoped variables
     let lastRenderLayout = null; // saved layout to export 1:1 pixels
+    // temp offscreen canvas for tinting
+    const tintOff = document.createElement('canvas');
+    const tintOffCtx = tintOff.getContext('2d');
+
+    function hexToRgb(hex) {
+        hex = normalizeHex(hex).slice(1);
+        return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) };
+    }
+
+    // draw tinted glyph onto destination context at (dx,dy) with 1:1 pixels
+    function drawTintedGlyphToCtx(g, destCtx, dx, dy, colorHex) {
+        tintOff.width = g.w;
+        tintOff.height = g.h;
+        tintOffCtx.clearRect(0,0,g.w,g.h);
+        tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
+        const img = tintOffCtx.getImageData(0,0,g.w,g.h);
+        const d = img.data;
+        const rgb = hexToRgb(colorHex);
+        for (let i = 0; i < d.length; i += 4) {
+            // if pixel has alpha > 0, replace rgb but preserve alpha
+            if (d[i+3] === 0) continue;
+            d[i] = rgb.r;
+            d[i+1] = rgb.g;
+            d[i+2] = rgb.b;
+        }
+        tintOffCtx.putImageData(img, 0, 0);
+        destCtx.drawImage(tintOff, 0, 0, g.w, g.h, dx, dy, g.w, g.h);
+    }
+
+    // visual gap (from slider) in source-pixel units
+    const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
 
     async function renderUsingGlyphs(text) {
         try {
@@ -144,9 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // visual gap (from slider) in source-pixel units
-            const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
-
             // store layout + visualGap so export uses exactly same spacing as screen
             lastRenderLayout = { layout: layout, visualGap: visualGap };
 
@@ -177,7 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const item = layout[idx];
                 if (item.type === 'glyph') {
                     const g = item.g;
-                    ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, 0, g.w, g.h);
+                    // tint with selected color when drawing to screen
+                    const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value) : '#000000');
+                    drawTintedGlyphToCtx(g, ctx, x, 0, color);
                     x += g.w;
                 } else {
                     x += item.srcW || 0;
@@ -235,67 +289,4 @@ document.addEventListener('DOMContentLoaded', () => {
             let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
-                if (item.srcH) maxH = Math.max(maxH, item.srcH);
-            }
-            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
-            if (totalW <= 0 || maxH <= 0) {
-                // fallback to default canvas export
-                console.warn('invalid lastRenderLayout, falling back to canvas export');
-            } else {
-                const tmp = document.createElement('canvas');
-                tmp.width = totalW;
-                tmp.height = maxH;
-                const tctx = tmp.getContext('2d');
-                tctx.imageSmoothingEnabled = false;
-
-                let x = 0;
-                for (let idx = 0; idx < layout.length; idx++) {
-                    const item = layout[idx];
-                    if (item.type === 'glyph') {
-                        const g = item.g;
-                        // draw source pixels 1:1
-                        tctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, 0, g.w, g.h);
-                        x += g.w;
-                    } else {
-                        // space/empty: leave transparent area of srcW
-                        x += item.srcW || 0;
-                    }
-                    // add visual gap after item except last
-                    if (idx < layout.length - 1) x += visualGap;
-                }
-
-                // convert near-white to transparent
-                const img = tctx.getImageData(0, 0, tmp.width, tmp.height);
-                const d = img.data;
-                for (let i = 0; i < d.length; i += 4) {
-                    const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-                    if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
-                        d[i+3] = 0;
-                    }
-                }
-                tctx.putImageData(img, 0, 0);
-                return tmp.toDataURL('image/png');
-            }
-        }
-
-        // Fallback: downscale visible canvas to logical pixels (account for DPR)
-        const dpr = window.devicePixelRatio || 1;
-        const w = Math.round(canvas.width / dpr);
-        const h = Math.round(canvas.height / dpr);
-        const tmp = document.createElement('canvas');
-        tmp.width = w;
-        tmp.height = h;
-        const tctx = tmp.getContext('2d');
-        tctx.imageSmoothingEnabled = false;
-        // draw scaled down so each CSS pixel becomes 1 image pixel
-        tctx.drawImage(canvas, 0, 0, w, h);
-        const img = tctx.getImageData(0, 0, w, h);
-        const d = img.data;
-        for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-            if (a > 0 && r >= threshold && g >= threshold && b >= threshold) d[i+3] = 0;
-        }
-        tctx.putImageData(img, 0, 0);
-        return tmp.toDataURL('image/png');
-    }
-});
+                if
