@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
     const input = document.getElementById('textInput');
     const btn = document.getElementById('generateBtn');
     const downloadLink = document.getElementById('downloadLink');
@@ -23,11 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleRender();
     });
 
-    // 즉시 캔버스 크기(시각적) 반영 + 미리보기 예약
+    // 즉시 캔버스 스타일 크기만 반영(버퍼는 렌더 시 적용)
     function applyCanvasSizeVisual(w, h) {
-        canvas.width = w;
-        canvas.height = h;
-        // 명시적으로 스타일 너비/높이도 설정 -> 렌더링/표시 크기 일치
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
     }
@@ -36,40 +32,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const scheduleRender = debounce(() => {
         const t = input.value.trim() || 'Sample';
         renderDotText(t);
-    }, 250);
+    }, 200);
 
-    widthInput.addEventListener('input', () => {
-        const v = Math.max(50, parseInt(widthInput.value, 10) || 800);
-        widthInput.value = v;
-        applyCanvasSizeVisual(v, parseInt(heightInput.value, 10) || canvas.height);
+    // input/change 모두 반영
+    function onSizeInput() {
+        const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
+        const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
+        widthInput.value = w;
+        heightInput.value = h;
+        applyCanvasSizeVisual(w, h);
         scheduleRender();
-    });
-
-    heightInput.addEventListener('input', () => {
-        const v = Math.max(50, parseInt(heightInput.value, 10) || 200);
-        heightInput.value = v;
-        applyCanvasSizeVisual(parseInt(widthInput.value, 10) || canvas.width, v);
-        scheduleRender();
-    });
+    }
+    widthInput.addEventListener('input', onSizeInput);
+    widthInput.addEventListener('change', onSizeInput);
+    heightInput.addEventListener('input', onSizeInput);
+    heightInput.addEventListener('change', onSizeInput);
 
     async function renderDotText(text) {
         const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
         const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
         const dotSize = Math.max(1, parseInt(dotSizeInput.value, 10) || 8);
 
-        // 캔버스 크기 설정 (그리기 버퍼)
-        canvas.width = w;
-        canvas.height = h;
+        // DPR(고해상도) 처리: 내부 버퍼는 DPR 배율로 키우고 스타일은 CSS픽셀 유지
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
 
-        // 오프스크린 캔버스(텍스트 렌더링용)
-        const off = document.createElement('canvas');
-        off.width = w;
-        off.height = h;
-        const offCtx = off.getContext('2d');
+        // 컨텍스트는 리사이즈 후 다시 가져오고 스케일 적용
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 이후 그리기는 CSS 픽셀 단위
 
-        // 폰트 크기 계산 (높이에 비례)
+        // 오프스크린 캔버스(텍스트 렌더링용)도 DPR 고려
+        const off = document.createElement('canvas');
+        off.width = Math.round(w * dpr);
+        off.height = Math.round(h * dpr);
+        off.style.width = w + 'px';
+        off.style.height = h + 'px';
+        const offCtx = off.getContext('2d');
+        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // 폰트 크기 계산 (CSS 픽셀 기준)
         const fontSize = Math.max(12, Math.floor(h * 0.6));
         await document.fonts.load(`${fontSize}px "UnifrakturMaguntia"`);
 
@@ -84,8 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
         offCtx.font = `${fontSize}px "UnifrakturMaguntia", serif`;
         offCtx.fillText(text, w / 2, h / 2);
 
-        // 픽셀 데이터 읽기
-        const img = offCtx.getImageData(0, 0, w, h);
+        // 픽셀 데이터 읽기 (CSS 픽셀 크기 영역)
+        const img = offCtx.getImageData(0, 0, Math.round(w), Math.round(h));
         const data = img.data;
 
         // 표시 캔버스 초기화(배경)
@@ -93,15 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
 
-        // 도트 그리기: 그리드 간격 = dotSize, 샘플 위치은 셀 중앙
+        // 도트 그리기: 그리드 간격 = dotSize, 샘플 위치는 셀 중앙
         const radius = Math.max(0.5, dotSize / 2 * 0.9);
         for (let y = 0; y < h; y += dotSize) {
             for (let x = 0; x < w; x += dotSize) {
-                const sx = Math.min(w - 1, x + Math.floor(dotSize / 2));
-                const sy = Math.min(h - 1, y + Math.floor(dotSize / 2));
-                const idx = (sy * w + sx) * 4;
+                const sx = Math.min(Math.round(w) - 1, x + Math.floor(dotSize / 2));
+                const sy = Math.min(Math.round(h) - 1, y + Math.floor(dotSize / 2));
+                const idx = (sy * Math.round(w) + sx) * 4;
                 const alpha = data[idx + 3];
-                // 픽셀이 텍스트(검정)에 가깝다면 도트 그리기
                 if (alpha > 50) {
                     const r = data[idx];
                     const g = data[idx + 1];
