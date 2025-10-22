@@ -148,9 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (!g) {
-                    // unknown char -> keep previous behavior or use gap
+                    // unknown char -> placeholder gap
                     ctx.fillStyle = '#ddd';
-                    ctx.fillRect(x, y, Math.max(4,glyphWidths[i]), canvasH - padding*2);
+                    ctx.fillRect(x, y, Math.max(4, glyphWidths[i]), canvasH - padding*2);
                     x += glyphWidths[i] + spacing;
                     continue;
                 }
@@ -160,8 +160,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 off.height = sH;
                 offCtx.clearRect(0,0,sW,sH);
                 offCtx.drawImage(spriteImg, g.sx, g.sy, sW, sH, 0, 0, sW, sH);
-                // draw scaled without smoothing to preserve pixel blocks
-                ctx.drawImage(off, 0, 0, sW, sH, x, y, sW * scale, sH * scale);
+
+                // draw per-source-pixel as filled rects (preserve color; scale is integer)
+                const imgData = offCtx.getImageData(0, 0, sW, sH).data;
+                for (let py = 0; py < sH; py++) {
+                    for (let px = 0; px < sW; px++) {
+                        const idx = (py * sW + px) * 4;
+                        const a = imgData[idx + 3];
+                        if (a === 0) continue;
+                        const r = imgData[idx], gcol = imgData[idx + 1], b = imgData[idx + 2];
+                        const alpha = (a / 255);
+                        ctx.fillStyle = `rgba(${r},${gcol},${b},${alpha})`;
+                        const drawX = x + px * scale;
+                        const drawY = y + py * scale;
+                        ctx.fillRect(drawX, drawY, Math.max(1, scale), Math.max(1, scale));
+                    }
+                }
 
                 x += sW * scale + spacing;
             }
