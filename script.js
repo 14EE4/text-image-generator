@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
+    // add near top of file-scoped variables
+    let lastRenderLayout = null; // saved layout to export 1:1 pixels
+
     async function renderUsingGlyphs(text) {
         try {
             console.log('renderUsingGlyphs()', { text, coordsLen: coords.length, spriteLoaded: spriteImg.complete && spriteImg.naturalWidth > 0 });
@@ -91,8 +94,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const spacing = 4;
             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
             const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
+            // Build layout info for export in source-pixel units
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-            let desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12));
+            const spaceSrcWidth = Math.max(1, Math.round(avgSrcW * 0.35));
+            const layout = [];
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                if (ch === ' ') {
+                    layout.push({ type: 'space', srcW: spaceSrcWidth });
+                } else if (!g) {
+                    // unknown -> reserve avg width
+                    layout.push({ type: 'empty', srcW: avgSrcW });
+                } else {
+                    layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
+                }
+            }
+            // store for export
+            lastRenderLayout = { layout: layout };
 
             const scales = [];
             const glyphWidths = [];
@@ -186,7 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // restore smoothing default
             ctx.imageSmoothingEnabled = true;
 
-            downloadLink.href = getTransparentDataURL(250); // threshold 0-255, 조정 가능
+            // after successful render, ensure download link uses export helper
+            downloadLink.href = getTransparentDataURL(250); // will use lastRenderLayout if available
             downloadLink.download = 'text-glyphs.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
@@ -219,20 +239,69 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function getTransparentDataURL(threshold = 250) {
-        // use canvas device pixels
-        const w = canvas.width, h = canvas.height;
+        // If we have a saved source-pixel layout, compose a 1:1 image from sprite
+        if (lastRenderLayout && lastRenderLayout.layout && lastRenderLayout.layout.length) {
+            const layout = lastRenderLayout.layout;
+            // compute total source width and max height
+            let totalW = 0;
+            let maxH = 0;
+            for (const item of layout) {
+                totalW += item.srcW || 0;
+                if (item.srcH) maxH = Math.max(maxH, item.srcH);
+            }
+            if (totalW <= 0 || maxH <= 0) {
+                // fallback to default canvas export
+                console.warn('invalid lastRenderLayout, falling back to canvas export');
+            } else {
+                const tmp = document.createElement('canvas');
+                tmp.width = totalW;
+                tmp.height = maxH;
+                const tctx = tmp.getContext('2d');
+                tctx.imageSmoothingEnabled = false;
+
+                let x = 0;
+                for (const item of layout) {
+                    if (item.type === 'glyph') {
+                        const g = item.g;
+                        // draw source pixels 1:1
+                        tctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, 0, g.w, g.h);
+                        x += g.w;
+                    } else {
+                        // space/empty: leave transparent area of srcW
+                        x += item.srcW || 0;
+                    }
+                }
+
+                // convert near-white to transparent
+                const img = tctx.getImageData(0, 0, tmp.width, tmp.height);
+                const d = img.data;
+                for (let i = 0; i < d.length; i += 4) {
+                    const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+                    if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
+                        d[i+3] = 0;
+                    }
+                }
+                tctx.putImageData(img, 0, 0);
+                return tmp.toDataURL('image/png');
+            }
+        }
+
+        // Fallback: downscale visible canvas to logical pixels (account for DPR)
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.round(canvas.width / dpr);
+        const h = Math.round(canvas.height / dpr);
         const tmp = document.createElement('canvas');
         tmp.width = w;
         tmp.height = h;
         const tctx = tmp.getContext('2d');
-        tctx.drawImage(canvas, 0, 0);
+        tctx.imageSmoothingEnabled = false;
+        // draw scaled down so each CSS pixel becomes 1 image pixel
+        tctx.drawImage(canvas, 0, 0, w, h);
         const img = tctx.getImageData(0, 0, w, h);
         const d = img.data;
         for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
-            if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
-                d[i + 3] = 0;
-            }
+            const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+            if (a > 0 && r >= threshold && g >= threshold && b >= threshold) d[i+3] = 0;
         }
         tctx.putImageData(img, 0, 0);
         return tmp.toDataURL('image/png');
