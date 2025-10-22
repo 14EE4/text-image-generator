@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
     const input = document.getElementById('textInput');
     const btn = document.getElementById('generateBtn');
     const downloadLink = document.getElementById('downloadLink');
@@ -8,128 +9,150 @@ document.addEventListener('DOMContentLoaded', () => {
     const dotSizeInput = document.getElementById('dotSize');
     const dotSizeVal = document.getElementById('dotSizeVal');
 
-    // 간단한 디바운스 유틸
-    function debounce(fn, delay = 200) {
-        let t;
-        return (...args) => {
-            clearTimeout(t);
-            t = setTimeout(() => fn(...args), delay);
-        };
+    dotSizeInput.addEventListener('input', () => dotSizeVal.textContent = dotSizeInput.value);
+
+    // load coords.json and sprite image
+    let coords = [];
+    let coordsMap = {};
+    let spriteImg = new Image();
+    const coordsPath = './coords.json';
+    const spritePath = './english_old2.png';
+
+    async function loadResources() {
+        try {
+            const res = await fetch(coordsPath);
+            if (!res.ok) throw new Error('coords.json not found');
+            const payload = await res.json();
+            coords = payload.coords || [];
+            coordsMap = {};
+            for (const c of coords) coordsMap[c.char] = c;
+            console.log('Loaded coords:', coords.length);
+        } catch (e) {
+            console.warn('coords.json load failed:', e.message);
+            coords = [];
+            coordsMap = {};
+        }
+
+        return new Promise((resolve) => {
+            spriteImg.onload = () => resolve();
+            spriteImg.onerror = () => {
+                console.warn('sprite image not loaded:', spritePath);
+                resolve();
+            };
+            spriteImg.src = spritePath;
+        });
     }
 
-    dotSizeInput.addEventListener('input', () => {
-        dotSizeVal.textContent = dotSizeInput.value;
-        scheduleRender();
-    });
-
-    // 즉시 캔버스 스타일 크기만 반영(버퍼는 렌더 시 적용)
-    function applyCanvasSizeVisual(w, h) {
-        canvas.style.width = w + 'px';
-        canvas.style.height = h + 'px';
-    }
-
-    // 디바운스된 렌더 호출
-    const scheduleRender = debounce(() => {
-        const t = input.value.trim() || 'Sample';
-        renderDotText(t);
-    }, 200);
-
-    // input/change 모두 반영
-    function onSizeInput() {
-        const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
-        const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
-        widthInput.value = w;
-        heightInput.value = h;
-        applyCanvasSizeVisual(w, h);
-        scheduleRender();
-    }
-    widthInput.addEventListener('input', onSizeInput);
-    widthInput.addEventListener('change', onSizeInput);
-    heightInput.addEventListener('input', onSizeInput);
-    heightInput.addEventListener('change', onSizeInput);
-
-    async function renderDotText(text) {
-        const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
-        const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
-        const dotSize = Math.max(1, parseInt(dotSizeInput.value, 10) || 8);
-
-        // DPR(고해상도) 처리: 내부 버퍼는 DPR 배율로 키우고 스타일은 CSS픽셀 유지
+    function setCanvasSize(w, h) {
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
-        // 컨텍스트는 리사이즈 후 다시 가져오고 스케일 적용
-        const ctx = canvas.getContext('2d');
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 이후 그리기는 CSS 픽셀 단위
-
-        // 오프스크린 캔버스(텍스트 렌더링용)도 DPR 고려
-        const off = document.createElement('canvas');
-        off.width = Math.round(w * dpr);
-        off.height = Math.round(h * dpr);
-        off.style.width = w + 'px';
-        off.style.height = h + 'px';
-        const offCtx = off.getContext('2d');
-        offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        // 폰트 크기 계산 (CSS 픽셀 기준)
-        const fontSize = Math.max(12, Math.floor(h * 0.6));
-        await document.fonts.load(`${fontSize}px "UnifrakturMaguntia"`);
-
-        // 배경 흰색
-        offCtx.fillStyle = '#ffffff';
-        offCtx.fillRect(0, 0, w, h);
-
-        // 텍스트 그리기 (가운데 정렬)
-        offCtx.fillStyle = '#000000';
-        offCtx.textAlign = 'center';
-        offCtx.textBaseline = 'middle';
-        offCtx.font = `${fontSize}px "UnifrakturMaguntia", serif`;
-        offCtx.fillText(text, w / 2, h / 2);
-
-        // 픽셀 데이터 읽기 (CSS 픽셀 크기 영역)
-        const img = offCtx.getImageData(0, 0, Math.round(w), Math.round(h));
-        const data = img.data;
-
-        // 표시 캔버스 초기화(배경)
+    // render using glyph bitmaps (with optional dotization)
+    function renderUsingGlyphs(text, dotSize = 0) {
+        const w = Math.max(50, parseInt(widthInput.value, 10) || 800);
+        const h = Math.max(50, parseInt(heightInput.value, 10) || 200);
+        setCanvasSize(w, h);
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, w, h);
 
-        // 도트 그리기: 그리드 간격 = dotSize, 샘플 위치는 셀 중앙
-        const radius = Math.max(0.5, dotSize / 2 * 0.9);
-        for (let y = 0; y < h; y += dotSize) {
-            for (let x = 0; x < w; x += dotSize) {
-                const sx = Math.min(Math.round(w) - 1, x + Math.floor(dotSize / 2));
-                const sy = Math.min(Math.round(h) - 1, y + Math.floor(dotSize / 2));
-                const idx = (sy * Math.round(w) + sx) * 4;
-                const alpha = data[idx + 3];
-                if (alpha > 50) {
-                    const r = data[idx];
-                    const g = data[idx + 1];
-                    const b = data[idx + 2];
-                    ctx.fillStyle = `rgb(${r},${g},${b})`;
-                    ctx.beginPath();
-                    ctx.arc(x + dotSize / 2, y + dotSize / 2, radius, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
+        if (!coords || coords.length === 0 || !spriteImg.complete) {
+            ctx.fillStyle = '#000';
+            ctx.font = `${Math.floor(h*0.6)}px serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, w/2, h/2);
+            return;
         }
 
-        // 다운로드 링크 설정
+        // decide glyph target size (height = 60% canvas height)
+        const glyphTargetH = Math.floor(h * 0.6);
+        // use first coord height as source glyph height if available
+        const srcH = coords[0] && coords[0].h ? coords[0].h : glyphTargetH;
+        const scale = glyphTargetH / srcH;
+        const glyphTargetW = Math.round((coords[0] && coords[0].w ? coords[0].w : glyphTargetH) * scale);
+
+        // total width for fixed-width layout
+        const spacing = 4;
+        const totalW = text.length * glyphTargetW + Math.max(0, text.length - 1) * spacing;
+        let x = Math.round((w - totalW) / 2);
+        const y = Math.round((h - glyphTargetH) / 2);
+
+        // offscreen canvas for sampling glyph pixels when dotSize > 0
+        const off = document.createElement('canvas');
+        off.width = Math.round(glyphTargetW);
+        off.height = Math.round(glyphTargetH);
+        const offCtx = off.getContext('2d');
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+            if (!g) {
+                // placeholder box
+                ctx.fillStyle = '#ddd';
+                ctx.fillRect(x, y, glyphTargetW, glyphTargetH);
+                x += glyphTargetW + spacing;
+                continue;
+            }
+
+            if (dotSize > 1) {
+                // draw glyph from sprite into offscreen at target size, then dotize
+                off.width = glyphTargetW;
+                off.height = glyphTargetH;
+                offCtx.clearRect(0,0,off.width,off.height);
+                try {
+                    offCtx.drawImage(
+                        spriteImg,
+                        g.sx, g.sy, g.w, g.h,
+                        0, 0, off.width, off.height
+                    );
+                    const imgData = offCtx.getImageData(0,0,off.width,off.height).data;
+                    const radius = Math.max(0.5, dotSize/2*0.9);
+                    for (let yy = 0; yy < off.height; yy += dotSize) {
+                        for (let xx = 0; xx < off.width; xx += dotSize) {
+                            const sx = Math.min(off.width-1, xx + Math.floor(dotSize/2));
+                            const sy = Math.min(off.height-1, yy + Math.floor(dotSize/2));
+                            const idx = (sy * off.width + sx) * 4;
+                            const alpha = imgData[idx+3];
+                            if (alpha > 50) {
+                                const r = imgData[idx], gcol = imgData[idx+1], b = imgData[idx+2];
+                                ctx.fillStyle = `rgb(${r},${gcol},${b})`;
+                                ctx.beginPath();
+                                ctx.arc(x + xx + dotSize/2, y + yy + dotSize/2, radius, 0, Math.PI*2);
+                                ctx.fill();
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // fallback draw image normally
+                    ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphTargetW, glyphTargetH);
+                }
+            } else {
+                ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphTargetW, glyphTargetH);
+            }
+            x += glyphTargetW + spacing;
+        }
+
         downloadLink.href = canvas.toDataURL('image/png');
-        downloadLink.download = 'text-dot.png';
+        downloadLink.download = 'text-glyphs.png';
         downloadLink.style.display = 'inline';
         downloadLink.textContent = '이미지 다운로드';
     }
 
     btn.addEventListener('click', () => {
         const t = input.value.trim() || 'Sample';
-        renderDotText(t);
+        const dot = parseInt(dotSizeInput.value, 10) || 0;
+        renderUsingGlyphs(t, dot);
     });
 
-    // 초기 적용 및 미리보기
-    applyCanvasSizeVisual(parseInt(widthInput.value, 10) || 800, parseInt(heightInput.value, 10) || 200);
-    renderDotText(input.value.trim() || 'Sample');
+    // initial load
+    loadResources().then(() => {
+        const t = input.value.trim() || 'Sample';
+        renderUsingGlyphs(t, parseInt(dotSizeInput.value,10) || 0);
+    });
 });
