@@ -132,35 +132,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             lastRenderLayout = { layout: layout };
 
-            // compute total source size and draw 1:1 to canvas so screen == download
+            // visual gap (from slider) in source-pixel units
+            const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
+
+            // compute total source size including gaps between layout items
             let totalW = 0;
             let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
                 if (item.srcH) maxH = Math.max(maxH, item.srcH);
             }
+            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
             if (totalW <= 0) totalW = 1;
             if (maxH <= 0) maxH = 1;
 
             // set canvas to source-pixel dimensions (visible CSS size will match these pixels)
             setCanvasSize(totalW, maxH);
-            // clear to transparent so screen matches exported transparency
             ctx.clearRect(0, 0, totalW, maxH);
-
             ctx.imageSmoothingEnabled = false;
 
-            // draw each item 1:1 (no extra visual spacing)
+            // draw each item 1:1 and add visualGap between items
             let x = 0;
-            for (const item of layout) {
+            for (let idx = 0; idx < layout.length; idx++) {
+                const item = layout[idx];
                 if (item.type === 'glyph') {
                     const g = item.g;
-                    // draw glyph source pixels directly onto canvas at 1:1
                     ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, 0, g.w, g.h);
                     x += g.w;
                 } else {
-                    // space or empty: advance by srcW (leave transparent)
                     x += item.srcW || 0;
                 }
+                // add gap after item except last
+                if (idx < layout.length - 1) x += visualGap;
             }
 
             // update download link from same layout (will match screen)
