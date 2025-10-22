@@ -130,10 +130,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
                 }
             }
-            lastRenderLayout = { layout: layout };
 
             // visual gap (from slider) in source-pixel units
             const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
+
+            // store layout + visualGap so export uses exactly same spacing as screen
+            lastRenderLayout = { layout: layout, visualGap: visualGap };
 
             // compute total source size including gaps between layout items
             let totalW = 0;
@@ -203,13 +205,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // If we have a saved source-pixel layout, compose a 1:1 image from sprite
         if (lastRenderLayout && lastRenderLayout.layout && lastRenderLayout.layout.length) {
             const layout = lastRenderLayout.layout;
-            // compute total source width and max height
+            const visualGap = lastRenderLayout.visualGap || 0;
+            // compute total source width and max height (including visual gaps)
             let totalW = 0;
             let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
                 if (item.srcH) maxH = Math.max(maxH, item.srcH);
             }
+            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
             if (totalW <= 0 || maxH <= 0) {
                 // fallback to default canvas export
                 console.warn('invalid lastRenderLayout, falling back to canvas export');
@@ -221,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tctx.imageSmoothingEnabled = false;
 
                 let x = 0;
-                for (const item of layout) {
+                for (let idx = 0; idx < layout.length; idx++) {
+                    const item = layout[idx];
                     if (item.type === 'glyph') {
                         const g = item.g;
                         // draw source pixels 1:1
@@ -231,6 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         // space/empty: leave transparent area of srcW
                         x += item.srcW || 0;
                     }
+                    // add visual gap after item except last
+                    if (idx < layout.length - 1) x += visualGap;
                 }
 
                 // convert near-white to transparent
