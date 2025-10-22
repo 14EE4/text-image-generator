@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    function renderUsingGlyphs(text) {
+    async function renderUsingGlyphs(text) {
         try {
             console.log('renderUsingGlyphs()', { text, coordsLen: coords.length, spriteLoaded: spriteImg.complete && spriteImg.naturalWidth > 0 });
             if (!coords || coords.length === 0 || !spriteImg.complete || spriteImg.naturalWidth === 0) {
@@ -88,50 +88,102 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const srcW = coords[0].w || 16;
-            const srcH = coords[0].h || 16;
+            // Use original glyph pixel grid to draw dots.
+            // srcW/srcH come from each coord (glyph native size)
             const spacing = 4;
+            // choose uniform pixel scale to keep dots visible; prefer integer scaling
+            // compute a target glyph height (visual) but then convert to integer pixel scale per glyph
             const maxCanvasWidth = Math.min(1200, Math.max(600, Math.floor(window.innerWidth * 0.9)));
-            let scale = 2;
-            let glyphW = Math.round(srcW * scale);
-            let glyphH = Math.round(srcH * scale);
-            let totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
-            if (totalW > maxCanvasWidth) {
-                const avail = maxCanvasWidth - 20 - Math.max(0, text.length - 1) * spacing;
-                scale = Math.max(1, avail / (text.length * srcW));
-                glyphW = Math.max(1, Math.round(srcW * scale));
-                glyphH = Math.max(1, Math.round(srcH * scale));
-                totalW = text.length * glyphW + Math.max(0, text.length - 1) * spacing + 20;
+            // compute tentative scale based on average glyph height
+            const avgSrcH = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.h||0),0) / Math.max(1, coords.length)));
+            let desiredGlyphH = Math.max(8, Math.floor(window.innerHeight * 0.12)); // visual target
+            // will adjust per-glyph to integer scale
+            // Precompute glyph widths after integer scaling to compute total width
+            const scales = [];
+            const glyphWidths = [];
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                const srcH = g ? (g.h || avgSrcH) : avgSrcH;
+                let s = Math.max(1, Math.floor(desiredGlyphH / srcH)); // integer scale
+                // if single glyph would be too wide, reduce scale
+                const wAfter = (g ? g.w : avgSrcH) * s;
+                scales.push(s);
+                glyphWidths.push(wAfter);
             }
+            let totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
+            // if exceed maxCanvasWidth, reduce all scales proportionally (keeping integer)
+            if (totalW > maxCanvasWidth) {
+                const factor = maxCanvasWidth / totalW;
+                for (let i = 0; i < scales.length; i++) {
+                    const newScale = Math.max(1, Math.floor(scales[i] * factor));
+                    scales[i] = newScale;
+                    const g = coordsMap[text[i]] || coordsMap[text[i].toUpperCase()] || coordsMap[text[i].toLowerCase()];
+                    glyphWidths[i] = (g ? g.w : avgSrcH) * newScale;
+                }
+                totalW = glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1) * spacing + 20;
+            }
+
             const padding = 10;
-            const canvasW = totalW;
-            const canvasH = glyphH + padding * 2;
+            const canvasW = Math.max(200, Math.round(totalW));
+            const canvasH = Math.max(50, Math.round(Math.max(...glyphWidths.map((w,i)=> (coordsMap[text[i]] ? (coordsMap[text[i]].h||avgSrcH) * scales[i] : avgSrcH*scales[i]))) + padding * 2));
             setCanvasSize(canvasW, canvasH);
             ctx.clearRect(0,0,canvasW,canvasH);
             ctx.fillStyle = '#fff';
             ctx.fillRect(0,0,canvasW,canvasH);
 
-            let x = Math.round((canvasW - (text.length * glyphW + Math.max(0, text.length - 1) * spacing)) / 2);
-            const y = Math.round((canvasH - glyphH) / 2);
+            let x = Math.round((canvasW - (glyphWidths.reduce((a,b)=>a+b,0) + Math.max(0, text.length-1)*spacing)) / 2);
+            const yTop = Math.round((canvasH - (canvasH - padding*2)) / 2); // baseline top padding not critical
+
+            // offscreen canvas reused per glyph
+            const off = document.createElement('canvas');
+            const offCtx = off.getContext('2d');
 
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                const scale = scales[i] || 1;
                 if (!g) {
                     ctx.fillStyle = '#ddd';
-                    ctx.fillRect(x, y, glyphW, glyphH);
-                    x += glyphW + spacing;
+                    ctx.fillRect(x, padding, Math.max(4,glyphWidths[i]), canvasH - padding*2);
+                    x += glyphWidths[i] + spacing;
                     continue;
                 }
-                ctx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, x, y, glyphW, glyphH);
-                x += glyphW + spacing;
+
+                const sW = g.w, sH = g.h;
+                off.width = sW;
+                off.height = sH;
+                offCtx.clearRect(0,0,sW,sH);
+                offCtx.drawImage(spriteImg, g.sx, g.sy, sW, sH, 0, 0, sW, sH);
+                const img = offCtx.getImageData(0,0,sW,sH).data;
+
+                // draw a dot per source pixel (circle), positioned and scaled by integer 'scale'
+                const pixelSize = scale;
+                const radius = Math.max(0.2, pixelSize * 0.45);
+                for (let py = 0; py < sH; py++) {
+                    for (let px = 0; px < sW; px++) {
+                        const idx = (py * sW + px) * 4;
+                        const a = img[idx + 3];
+                        if (a > 50) {
+                            const r = img[idx], gcol = img[idx + 1], b = img[idx + 2];
+                            ctx.fillStyle = `rgb(${r},${gcol},${b})`;
+                            const cx = x + px * pixelSize + pixelSize / 2;
+                            const cy = padding + py * pixelSize + pixelSize / 2;
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+
+                x += sW * pixelSize + spacing;
             }
 
             downloadLink.href = canvas.toDataURL('image/png');
-            downloadLink.download = 'text-glyphs.png';
+            downloadLink.download = 'text-glyphs-dot.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
-            setStatus('Rendered successfully');
+            setStatus('Rendered (original dots) successfully');
         } catch (err) {
             console.error('render error', err);
             setStatus('Render error: see console', true);
