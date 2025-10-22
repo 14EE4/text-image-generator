@@ -15,18 +15,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // display scale control
     const displayScaleInput = document.getElementById('displayScale');
     const displayScaleVal = document.getElementById('displayScaleVal');
-    if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
-    if (displayScaleInput) {
-        displayScaleInput.addEventListener('input', () => {
-            if (displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
-            const t = input.value.trim() || 'Sample';
-            renderUsingGlyphs(t);
-        });
-    }
 
     // color controls (picker + hex input)
     const colorPicker = document.getElementById('colorPicker');
     const colorHex = document.getElementById('colorHex');
+
+    // status banner
+    const status = document.createElement('div');
+    status.id = 'statusBanner';
+    status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
+    if (canvas && canvas.parentNode) canvas.parentNode.insertBefore(status, canvas);
+    function setStatus(msg, isError = false) {
+        status.textContent = msg;
+        status.style.color = isError ? '#a00' : '#080';
+        console.log('[STATUS]', msg);
+    }
+
     function normalizeHex(v) {
         if (!v) return '#000000';
         v = v.trim();
@@ -35,52 +39,60 @@ document.addEventListener('DOMContentLoaded', () => {
         if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
         return '#000000';
     }
+    function hexToRgb(hex) {
+        hex = normalizeHex(hex).slice(1);
+        return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) };
+    }
+
+    // initialize UI displays
+    if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
+    if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
+    if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+    if (colorPicker && colorHex) {
+        colorHex.value = normalizeHex(colorPicker.value || colorHex.value);
+        colorPicker.value = normalizeHex(colorHex.value);
+    }
+
+    // re-render helpers
+    function triggerRender() {
+        const t = input ? (input.value.trim() || '') : '';
+        renderUsingGlyphs(t);
+    }
+    if (displayScaleInput) displayScaleInput.addEventListener('input', () => {
+        if (displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
+        triggerRender();
+    });
+    if (letterSpacingInput) letterSpacingInput.addEventListener('input', () => {
+        if (letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
+        triggerRender();
+    });
+    if (spaceWidthInput) spaceWidthInput.addEventListener('input', () => {
+        if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+        triggerRender();
+    });
     if (colorPicker && colorHex) {
         colorPicker.addEventListener('input', () => {
             colorHex.value = normalizeHex(colorPicker.value);
-            renderUsingGlyphs(input.value.trim() || 'Sample');
+            triggerRender();
         });
         colorHex.addEventListener('input', () => {
-            const v = normalizeHex(colorHex.value);
-            colorHex.value = v;
-            try { colorPicker.value = v; } catch (e) {}
-            renderUsingGlyphs(input.value.trim() || 'Sample');
+            colorHex.value = normalizeHex(colorHex.value);
+            try { colorPicker.value = colorHex.value; } catch(e) {}
+            triggerRender();
         });
     }
 
-    // initialize displays if elements exist
-    if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
-    if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
-
-    // re-render when sliders change
-    if (letterSpacingInput) {
-        letterSpacingInput.addEventListener('input', () => {
-            if (letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
-            const t = input.value.trim() || 'Sample';
-            renderUsingGlyphs(t);
-        });
-    }
-    if (spaceWidthInput) {
-        spaceWidthInput.addEventListener('input', () => {
-            if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
-            const t = input.value.trim() || 'Sample';
-            renderUsingGlyphs(t);
+    // Enter to generate
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                triggerRender();
+            }
         });
     }
 
-    // status banner (visible on page)
-    const status = document.createElement('div');
-    status.id = 'statusBanner';
-    status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
-    document.body.insertBefore(status, document.getElementById('canvas'));
-
-    function setStatus(msg, isError = false) {
-        status.textContent = msg;
-        status.style.color = isError ? '#a00' : '#080';
-        console.log('[STATUS]', msg);
-    }
-
-    // resources (fixed: coords.json + english_old2.png)
+    // resources
     let coords = [];
     let coordsMap = {};
     const coordsPath = './coords.json';
@@ -91,31 +103,25 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus('Loading coords.json...');
         try {
             const res = await fetch(coordsPath);
-            if (!res.ok) throw new Error(`coords.json fetch failed: ${res.status} ${res.statusText}`);
+            if (!res.ok) throw new Error(`coords.json fetch failed: ${res.status}`);
             const payload = await res.json();
             coords = payload.coords || [];
             coordsMap = {};
-            for (const c of coords) {
-                if (c && c.char !== undefined) coordsMap[c.char] = c;
-            }
-            console.log('Loaded coords:', coords.length);
-            setStatus(`coords.json loaded (${coords.length} entries)`);
+            for (const c of coords) if (c && c.char !== undefined) coordsMap[c.char] = c;
+            setStatus(`coords.json loaded (${coords.length})`);
         } catch (e) {
-            console.error('coords.json load failed', e);
+            console.error(e);
             setStatus(`coords.json load failed: ${e.message}`, true);
-            coords = [];
-            coordsMap = {};
+            coords = []; coordsMap = {};
         }
-
         return new Promise((resolve) => {
             spriteImg.onload = () => {
-                console.log('sprite loaded:', spritePath, spriteImg.naturalWidth, 'x', spriteImg.naturalHeight);
                 setStatus(`sprite loaded: ${spritePath} (${spriteImg.naturalWidth}x${spriteImg.naturalHeight})`);
                 resolve();
             };
             spriteImg.onerror = (ev) => {
-                console.warn('sprite image load error', spritePath, ev);
-                setStatus(`sprite load failed: ${spritePath}`, true);
+                console.warn('sprite load error', ev);
+                setStatus('sprite load failed', true);
                 resolve();
             };
             spriteImg.src = spritePath;
@@ -126,167 +132,200 @@ document.addEventListener('DOMContentLoaded', () => {
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
-        // default CSS size equals logical pixels; caller can override CSS size (display scale)
+        // default CSS size equals logical pixels; caller may override style for display scaling
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    // add near top of file-scoped variables
-    let lastRenderLayout = null; // saved layout to export 1:1 pixels
-    // temp offscreen canvas for tinting
+    // tint offscreen
+    let lastRenderLayout = null;
     const tintOff = document.createElement('canvas');
     const tintOffCtx = tintOff.getContext('2d');
 
-    function hexToRgb(hex) {
-        hex = normalizeHex(hex).slice(1);
-        return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) };
-    }
-
-    // draw tinted glyph onto destination context at (dx,dy) with 1:1 pixels
     function drawTintedGlyphToCtx(g, destCtx, dx, dy, colorHex) {
-        tintOff.width = g.w;
-        tintOff.height = g.h;
+        tintOff.width = g.w; tintOff.height = g.h;
         tintOffCtx.clearRect(0,0,g.w,g.h);
         tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
         const img = tintOffCtx.getImageData(0,0,g.w,g.h);
         const d = img.data;
         const rgb = hexToRgb(colorHex);
         for (let i = 0; i < d.length; i += 4) {
-            // if pixel has alpha > 0, replace rgb but preserve alpha
             if (d[i+3] === 0) continue;
-            d[i] = rgb.r;
-            d[i+1] = rgb.g;
-            d[i+2] = rgb.b;
+            d[i] = rgb.r; d[i+1] = rgb.g; d[i+2] = rgb.b;
         }
         tintOffCtx.putImageData(img, 0, 0);
         destCtx.drawImage(tintOff, 0, 0, g.w, g.h, dx, dy, g.w, g.h);
     }
 
-    // visual gap (from slider) in source-pixel units
-    const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value, 10) : 1;
+    function sanitizeFilename(text) {
+        const rawName = (text || '').trim() || 'text-glyphs';
+        return rawName.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_\-\.]/g, '').slice(0,64) || 'text-glyphs';
+    }
 
     async function renderUsingGlyphs(text) {
         try {
             console.log('renderUsingGlyphs()', { text, coordsLen: coords.length, spriteLoaded: spriteImg.complete && spriteImg.naturalWidth > 0 });
             if (!coords || coords.length === 0 || !spriteImg.complete || spriteImg.naturalWidth === 0) {
-                setStatus('Fallback: drawing simple text (missing coords or sprite)', true);
-                const w = 800, h = 200;
-                setCanvasSize(w, h);
-                ctx.clearRect(0,0,w,h);
+                setStatus('Fallback: missing coords/sprite', true);
+                setCanvasSize(600, 120);
+                ctx.clearRect(0,0,600,120);
                 ctx.fillStyle = '#000';
-                ctx.font = `${Math.floor(h*0.3)}px serif`;
+                ctx.font = '24px serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(text, w/2, h/2);
+                ctx.fillText(text || '', 300, 60);
                 downloadLink.style.display = 'none';
                 return;
             }
 
-            // Build layout info for export in source-pixel units (same as download)
+            // layout (source-pixel units)
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-            const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value, 10) : avgSrcW;
+            const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value,10) : avgSrcW;
             const layout = [];
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
                 const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                if (ch === ' ') {
-                    layout.push({ type: 'space', srcW: spaceSrcWidth });
-                } else if (!g) {
-                    layout.push({ type: 'empty', srcW: avgSrcW });
-                } else {
-                    layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
-                }
+                if (ch === ' ') layout.push({ type: 'space', srcW: spaceSrcWidth });
+                else if (!g) layout.push({ type: 'empty', srcW: avgSrcW });
+                else layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
             }
 
-            // store layout + visualGap so export uses exactly same spacing as screen
-            lastRenderLayout = { layout: layout, visualGap: visualGap };
+            const visualGapNow = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value,10) : 1;
+            lastRenderLayout = { layout: layout, visualGap: visualGapNow };
 
-            // compute total source size including gaps between layout items
-            let totalW = 0;
-            let maxH = 0;
+            // compute total source size including gaps
+            let totalW = 0; let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
                 if (item.srcH) maxH = Math.max(maxH, item.srcH);
             }
-            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
+            if (layout.length > 1) totalW += (layout.length - 1) * visualGapNow;
             if (totalW <= 0) totalW = 1;
-            if (maxH <= 0) maxH = 1;
+            if (maxH <= 0) maxH = coords.reduce((m,c)=>Math.max(m,c.h||0), 1);
 
-            // set canvas to source-pixel dimensions (visible CSS size will match these pixels)
+            // set canvas to source-pixel logical size and apply display scale
             setCanvasSize(totalW, maxH);
-            ctx.clearRect(0, 0, totalW, maxH);
+            ctx.clearRect(0,0,totalW, maxH);
             ctx.imageSmoothingEnabled = false;
-
-            // apply visual display scale (only affects CSS display size, not backing pixels/download)
-            const displayScale = (displayScaleInput && !isNaN(Number(displayScaleInput.value))) ? parseInt(displayScaleInput.value, 10) : 1;
+            const displayScale = (displayScaleInput && !isNaN(Number(displayScaleInput.value))) ? parseInt(displayScaleInput.value,10) : 1;
             canvas.style.width = Math.round(totalW * displayScale) + 'px';
             canvas.style.height = Math.round(maxH * displayScale) + 'px';
 
-            // draw each item 1:1 and add visualGap between items
+            // draw items tinted
             let x = 0;
+            const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
             for (let idx = 0; idx < layout.length; idx++) {
                 const item = layout[idx];
                 if (item.type === 'glyph') {
-                    const g = item.g;
-                    // tint with selected color when drawing to screen
-                    const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value) : '#000000');
-                    drawTintedGlyphToCtx(g, ctx, x, 0, color);
-                    x += g.w;
+                    drawTintedGlyphToCtx(item.g, ctx, x, 0, color);
+                    x += item.srcW || 0;
                 } else {
                     x += item.srcW || 0;
                 }
-                // add gap after item except last
-                if (idx < layout.length - 1) x += visualGap;
+                if (idx < layout.length - 1) x += visualGapNow;
             }
 
-            // update download link from same layout (will match screen)
+            // update download link (filename from text)
             downloadLink.href = getTransparentDataURL(250);
-            // generate safe filename from rendered text
-            const rawName = (text || '').trim() || 'text-glyphs';
-            const safeName = rawName
-                .replace(/\s+/g, '_')                // spaces -> _
-                .replace(/[^A-Za-z0-9_\-\.]/g, '')   // remove unsafe chars
-                .slice(0, 64) || 'text-glyphs';      // limit length
-            downloadLink.download = safeName + '.png';
-             downloadLink.style.display = 'inline';
-             downloadLink.textContent = '이미지 다운로드';
-             setStatus('Rendered (screen matches download) successfully');
+            downloadLink.download = sanitizeFilename(text) + '.png';
+            downloadLink.style.display = 'inline';
+            downloadLink.textContent = '이미지 다운로드';
+            setStatus('Rendered (screen matches download) successfully');
         } catch (err) {
             console.error('render error', err);
             setStatus('Render error: see console', true);
         }
     }
 
-    btn.addEventListener('click', () => {
-        console.log('Generate button clicked');
-        const t = input.value.trim() || 'Sample';
-        renderUsingGlyphs(t);
-    });
-
-    // Enter 키로 바로 변환
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const t = input.value.trim() || 'Sample';
-            renderUsingGlyphs(t);
-        }
-    });
-
-    // initial load & render
-    loadResources().then(() => {
-        const t = input.value.trim() || 'Sample';
-        renderUsingGlyphs(t);
-    });
-
     function getTransparentDataURL(threshold = 250) {
-        // If we have a saved source-pixel layout, compose a 1:1 image from sprite
         if (lastRenderLayout && lastRenderLayout.layout && lastRenderLayout.layout.length) {
             const layout = lastRenderLayout.layout;
             const visualGap = lastRenderLayout.visualGap || 0;
-            // compute total source width and max height (including visual gaps)
-            let totalW = 0;
-            let maxH = 0;
+            // compute width/height
+            let totalW = 0; let maxH = 0;
             for (const item of layout) {
                 totalW += item.srcW || 0;
-                if
+                if (item.srcH) maxH = Math.max(maxH, item.srcH);
+            }
+            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
+            if (totalW <= 0 || maxH <= 0) return canvas.toDataURL('image/png');
+
+            const tmp = document.createElement('canvas');
+            tmp.width = totalW; tmp.height = maxH;
+            const tctx = tmp.getContext('2d');
+            tctx.imageSmoothingEnabled = false;
+
+            let x = 0;
+            const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
+            for (let idx = 0; idx < layout.length; idx++) {
+                const item = layout[idx];
+                if (item.type === 'glyph') {
+                    const g = item.g;
+                    // tint glyph into tintOff then blit
+                    tintOff.width = g.w; tintOff.height = g.h;
+                    tintOffCtx.clearRect(0,0,g.w,g.h);
+                    tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
+                    const img = tintOffCtx.getImageData(0,0,g.w,g.h);
+                    const d = img.data;
+                    const rgb = hexToRgb(color);
+                    for (let pi = 0; pi < d.length; pi += 4) {
+                        if (d[pi+3] === 0) continue;
+                        d[pi] = rgb.r; d[pi+1] = rgb.g; d[pi+2] = rgb.b;
+                    }
+                    tintOffCtx.putImageData(img, 0, 0);
+                    tctx.drawImage(tintOff, 0, 0, g.w, g.h, x, 0, g.w, g.h);
+                    x += g.w;
+                } else {
+                    x += item.srcW || 0;
+                }
+                if (idx < layout.length - 1) x += visualGap;
+            }
+
+            // white->transparent
+            const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
+            const dAll = imgAll.data;
+            for (let i = 0; i < dAll.length; i += 4) {
+                const r = dAll[i], g = dAll[i+1], b = dAll[i+2], a = dAll[i+3];
+                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) dAll[i+3] = 0;
+            }
+            tctx.putImageData(imgAll, 0, 0);
+            return tmp.toDataURL('image/png');
+        }
+
+        // fallback: export visible canvas (CSS size)
+        try {
+            const rect = canvas.getBoundingClientRect();
+            const outW = Math.max(1, Math.round(rect.width));
+            const outH = Math.max(1, Math.round(rect.height));
+            const tmp = document.createElement('canvas');
+            tmp.width = outW; tmp.height = outH;
+            const tctx = tmp.getContext('2d');
+            tctx.imageSmoothingEnabled = false;
+            tctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, outW, outH);
+            const img = tctx.getImageData(0,0,outW,outH);
+            const d = img.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) d[i+3] = 0;
+            }
+            tctx.putImageData(img,0,0);
+            return tmp.toDataURL('image/png');
+        } catch (e) {
+            console.error('export fallback failed', e);
+            return canvas.toDataURL('image/png');
+        }
+    }
+
+    // wire up buttons
+    if (btn) btn.addEventListener('click', () => {
+        console.log('Generate button clicked');
+        triggerRender();
+    });
+    if (downloadLink) downloadLink.style.display = 'none';
+
+    // initial load & render
+    loadResources().then(() => {
+        triggerRender();
+    });
+});
