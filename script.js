@@ -12,6 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const spaceWidthInput = document.getElementById('spaceWidth');
     const spaceWidthVal = document.getElementById('spaceWidthVal');
 
+    // display scale control
+    const displayScaleInput = document.getElementById('displayScale');
+    const displayScaleVal = document.getElementById('displayScaleVal');
+    if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
+    if (displayScaleInput) {
+        displayScaleInput.addEventListener('input', () => {
+            if (displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
+            const t = input.value.trim() || 'Sample';
+            renderUsingGlyphs(t);
+        });
+    }
+
     // initialize displays if elements exist
     if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
     if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
@@ -90,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
+        // default CSS size equals logical pixels; caller can override CSS size (display scale)
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -152,6 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setCanvasSize(totalW, maxH);
             ctx.clearRect(0, 0, totalW, maxH);
             ctx.imageSmoothingEnabled = false;
+
+            // apply visual display scale (only affects CSS display size, not backing pixels/download)
+            const displayScale = (displayScaleInput && !isNaN(Number(displayScaleInput.value))) ? parseInt(displayScaleInput.value, 10) : 1;
+            canvas.style.width = Math.round(totalW * displayScale) + 'px';
+            canvas.style.height = Math.round(maxH * displayScale) + 'px';
 
             // draw each item 1:1 and add visualGap between items
             let x = 0;
