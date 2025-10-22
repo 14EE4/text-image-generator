@@ -2,93 +2,15 @@ import argparse
 import json
 import csv
 from statistics import median
-from math import floor
 from PIL import Image
 
 def is_nonwhite_pixel(px, alpha_thresh=10, white_thresh=240):
-    r,g,b,a = px
+    r, g, b, a = px
     if a is None:
         a = 255
     if a < alpha_thresh:
         return False
     return not (r > white_thresh and g > white_thresh and b > white_thresh)
-
-# --- NEW: single-row glyph detection (split by vertical whitespace) ---
-def detect_glyphs_from_single_row(img, white_thresh=240, alpha_thresh=10, gap_tolerance=1, min_glyph_width=2):
-    """
-    Detect glyph bounding columns in a single-row sprite by scanning vertical whitespace.
-    Returns list of glyph dicts: { sx, w, sy, h } (sy set to 0, h = image height to avoid per-glyph y-offset)
-    """
-    w, h = img.size
-    rgba = img.convert('RGBA')
-    px = rgba.load()
-
-    # column non-white counts
-    col_nonwhite = [0] * w
-    for x in range(w):
-        cnt = 0
-        for y in range(h):
-            r,g,b,a = px[x,y]
-            a = 255 if a is None else a
-            if a >= alpha_thresh and not (r > white_thresh and g > white_thresh and b > white_thresh):
-                cnt += 1
-        col_nonwhite[x] = cnt
-
-    # find contiguous non-empty column blocks
-    blocks = []
-    in_block = False
-    start = 0
-    for x, val in enumerate(col_nonwhite):
-        empty = (val == 0)
-        if not empty and not in_block:
-            in_block = True
-            start = x
-        if (empty or x == w-1) and in_block:
-            end = x-1 if empty else x
-            blocks.append({'start': start, 'end': end})
-            in_block = False
-
-    # merge small gaps: if gap between blocks <= gap_tolerance, merge them
-    if gap_tolerance > 0 and len(blocks) > 1:
-        merged = []
-        cur = blocks[0]
-        for b in blocks[1:]:
-            gap = b['start'] - cur['end'] - 1
-            if gap <= gap_tolerance:
-                cur['end'] = b['end']
-            else:
-                merged.append(cur)
-                cur = b
-        merged.append(cur)
-        blocks = merged
-
-    # filter narrow noise blocks -- set sy=0 and use full image height to avoid per-glyph y offsets
-    glyphs = []
-    for b in blocks:
-        width = b['end'] - b['start'] + 1
-        if width < min_glyph_width:
-            continue
-        # do NOT compute top/bottom; use sy = 0 and full image height
-        glyphs.append({'sx': b['start'], 'w': width, 'sy': 0, 'h': h})
-
-    return glyphs
-
-def map_order_to_coords_single_row(order, glyphs):
-    coords = []
-    for i, ch in enumerate(order):
-        if i >= len(glyphs):
-            break
-        g = glyphs[i]
-        coords.append({
-            'char': ch,
-            'index': i,
-            'sx': g['sx'],
-            'sy': g['sy'],
-            'w': g['w'],
-            'h': g['h']
-        })
-    return coords
-# --- END NEW ---
 
 def detect_blocks(arr):
     blocks = []
@@ -106,96 +28,40 @@ def detect_blocks(arr):
     return blocks
 
 def detect_sprite_grid(img, auto_cell=True):
-    # improved detection: find column/row centers (peaks) and infer cell size from median spacing
     w, h = img.size
     rgba = img.convert('RGBA')
     px = rgba.load()
 
-    def is_nonwhite_at(x, y, alpha_thresh=10, white_thresh=240):
-        r, g, b, a = px[x, y]
-        if a is None:
-            a = 255
-        if a < alpha_thresh:
-            return False
-        return not (r > white_thresh and g > white_thresh and b > white_thresh)
-
-    colSum = [0] * w
-    rowSum = [0] * h
+    col_sum = [0]*w
+    row_sum = [0]*h
     for y in range(h):
         for x in range(w):
-            if is_nonwhite_at(x, y):
-                colSum[x] += 1
-                rowSum[y] += 1
+            if is_nonwhite_pixel(px[x,y]):
+                col_sum[x] += 1
+                row_sum[y] += 1
 
-    # fallback old block detect
-    def detect_blocks(arr):
-        blocks = []
-        in_block = False
-        start = 0
-        for i, v in enumerate(arr):
-            empty = (v == 0)
-            if not empty and not in_block:
-                in_block = True
-                start = i
-            if (empty or i == len(arr) - 1) and in_block:
-                end = (i - 1) if empty else i
-                blocks.append({'start': start, 'end': end, 'size': end - start + 1})
-                in_block = False
-        return blocks
+    col_blocks = detect_blocks(col_sum)
+    row_blocks = detect_blocks(row_sum)
 
-    # find local peak centers (simple)
-    def find_centers(arr, min_prom=1):
-        centers = []
-        L = len(arr)
-        for i in range(1, L - 1):
-            if arr[i] > 0 and arr[i] >= arr[i - 1] and arr[i] >= arr[i + 1] and arr[i] >= min_prom:
-                centers.append(i)
-        # include edges if appropriate
-        if not centers:
-            # fallback: treat any non-zero column as center candidates
-            for i, v in enumerate(arr):
-                if v > 0:
-                    centers.append(i)
-        return centers
+    col_sizes = [b['size'] for b in col_blocks] if col_blocks else []
+    row_sizes = [b['size'] for b in row_blocks] if row_blocks else []
 
-    maxCol = max(colSum) if colSum else 0
-    maxRow = max(rowSum) if rowSum else 0
-    colCenters = find_centers(colSum, max(1, int(maxCol * 0.15)))
-    rowCenters = find_centers(rowSum, max(1, int(maxRow * 0.15)))
+    cellW = int(median(col_sizes)) if (auto_cell and col_sizes) else None
+    cellH = int(median(row_sizes)) if (auto_cell and row_sizes) else None
 
-    # compute median spacing between centers
-    def median_spacing(centers):
-        if len(centers) < 2:
-            return None
-        d = [centers[i+1] - centers[i] for i in range(len(centers)-1) if centers[i+1] - centers[i] > 0]
-        if not d:
-            return None
-        d.sort()
-        mid = len(d)//2
-        return d[mid] if len(d)%2==1 else round((d[mid-1]+d[mid])/2)
-
-    cellW = median_spacing(colCenters) if auto_cell else None
-    cellH = median_spacing(rowCenters) if auto_cell else None
-
-    # fallback to block-median method if spacing detection failed
     if not cellW or cellW <= 0:
-        col_blocks = detect_blocks(colSum)
-        col_sizes = [b['size'] for b in col_blocks] if col_blocks else []
-        cellW = int(median(col_sizes)) if col_sizes else max(1, round(w / max(1, len(colSum) or 1)))
+        cellW = max(1, round(w / max(1, len(col_blocks) or 1)))
     if not cellH or cellH <= 0:
-        row_blocks = detect_blocks(rowSum)
-        row_sizes = [b['size'] for b in row_blocks] if row_blocks else []
-        cellH = int(median(row_sizes)) if row_sizes else max(1, round(h / max(1, len(rowSum) or 1)))
+        cellH = max(1, round(h / max(1, len(row_blocks) or 1)))
 
-    # determine row blocks and left offsets using rowSum blocks
-    row_blocks = detect_blocks(rowSum)
+    # find left offset for each detected row-block
     rowLefts = []
     for rb in row_blocks:
         left = w
         for x in range(w):
             found = False
-            for y in range(rb['start'], rb['end'] + 1):
-                if is_nonwhite_at(x, y):
+            for y in range(rb['start'], rb['end']+1):
+                if is_nonwhite_pixel(px[x,y]):
                     left = x
                     found = True
                     break
@@ -206,40 +72,86 @@ def detect_sprite_grid(img, auto_cell=True):
         rowLefts.append({'x': left, 'y': rb['start'], 'h': rb['size']})
 
     return {
-        'imageWidth': w,
-        'imageHeight': h,
-        'cellW': int(cellW),
-        'cellH': int(cellH),
-        'colsGuessCount': max(1, w // max(1, int(cellW))),
-        'rows': row_blocks,
-        'rowLefts': rowLefts,
-        'rawColSums': colSum,
-        'rawRowSums': rowSum
+        'imageWidth': w, 'imageHeight': h,
+        'cellW': cellW, 'cellH': cellH,
+        'colsGuessCount': max(1, w // cellW),
+        'rows': row_blocks, 'rowLefts': rowLefts,
+        'rawColBlocks': col_blocks, 'rawRowBlocks': row_blocks
     }
 
 def map_order_to_coords(order, grid):
+    """
+    Map characters in `order` to coordinates.
+    Prefer per-block widths from grid['rawColBlocks'] and assign blocks per row using rowLefts.
+    Fallback to fixed cellW when block info insufficient.
+    """
     w = grid['imageWidth']
     cellW = grid['cellW']
     cellH = grid['cellH']
     rowLefts = grid['rowLefts']
+    rawColBlocks = grid.get('rawColBlocks') or []
     coords = []
     idx = 0
-    for r, row in enumerate(rowLefts):
-        if idx >= len(order):
-            break
-        start_x = row['x']
-        cols_in_row = max(0, (w - start_x) // cellW)
-        for c in range(cols_in_row):
+
+    # prepare blocks partitioned by row (if rawColBlocks available)
+    blocks_by_row = []
+    if rawColBlocks and rowLefts:
+        # sort blocks just in case
+        blocks = sorted(rawColBlocks, key=lambda b: b['start'])
+        for ri, row in enumerate(rowLefts):
+            start_x = row['x']
+            # determine row end (next row's x or image width)
+            if ri + 1 < len(rowLefts):
+                row_end_bound = rowLefts[ri + 1]['x']
+            else:
+                row_end_bound = w
+            # collect blocks whose start lies within this row horizontal span
+            row_blocks = [b for b in blocks if b['start'] >= start_x and b['start'] < row_end_bound]
+            blocks_by_row.append({'row': row, 'blocks': row_blocks})
+
+    # If we have blocks_by_row, use them to map glyphs (variable widths)
+    if blocks_by_row:
+        for rb in blocks_by_row:
+            row = rb['row']
+            for b in rb['blocks']:
+                if idx >= len(order):
+                    break
+                sx = b['start']
+                bw = b.get('size', b.get('end', b.get('width', 0)) - b.get('start', sx) + 1)
+                sy = row.get('y', 0)
+                coords.append({
+                    'char': order[idx],
+                    'index': idx,
+                    'sx': sx,
+                    'sy': sy,
+                    'w': bw,
+                    'h': cellH
+                })
+                idx += 1
             if idx >= len(order):
                 break
-            sx = start_x + c * cellW
-            # do NOT use row['y']; force sy = 0 to avoid per-row vertical offsets
-            coords.append({
-                'char': order[idx],
-                'index': idx,
-                'sx': sx, 'sy': 0, 'w': cellW, 'h': cellH
-            })
-            idx += 1
+
+    # If still characters remain, fall back to grid cell mapping (left→right rows)
+    if idx < len(order):
+        for r, row in enumerate(rowLefts):
+            if idx >= len(order):
+                break
+            start_x = row['x']
+            cols_in_row = max(0, (w - start_x) // cellW)
+            for c in range(cols_in_row):
+                if idx >= len(order):
+                    break
+                sx = start_x + c * cellW
+                sy = row.get('y', 0)
+                coords.append({
+                    'char': order[idx],
+                    'index': idx,
+                    'sx': sx, 'sy': sy, 'w': cellW, 'h': cellH
+                })
+                idx += 1
+            if idx >= len(order):
+                break
+
     return coords
 
 def save_json(coords, meta, outpath):
@@ -269,9 +181,6 @@ def main():
     p.add_argument('--order', help='char order string (default AaBbCc...Zz)')
     p.add_argument('--out', '-o', default='coords.json', help='output json path')
     p.add_argument('--csv', help='also write CSV to this path')
-    p.add_argument('--singleRow', action='store_true', help='detect glyphs by splitting on vertical whitespace (single row sprite)')
-    p.add_argument('--gap', type=int, default=1, help='max gap (px) to merge across when detecting glyphs')
-    p.add_argument('--minGlyphW', type=int, default=2, help='minimum glyph width (px) to keep')
     args = p.parse_args()
 
     img = Image.open(args.image)
@@ -280,35 +189,12 @@ def main():
     else:
         order = make_alternating_order()
 
-    print(f"Using order (len={len(order)}): {order[:60]}{'...' if len(order)>60 else ''}")
-
-    if args.singleRow:
-        glyphs = detect_glyphs_from_single_row(img, gap_tolerance=args.gap, min_glyph_width=args.minGlyphW)
-        print(f"Detected {len(glyphs)} glyph blocks (single-row mode).")
-        coords = map_order_to_coords_single_row(order, glyphs)
-        print(f"Mapped {len(coords)} chars from order to detected glyphs.")
-        meta = {
-            'image': args.image,
-            'imageWidth': img.size[0],
-            'imageHeight': img.size[1],
-            'mode': 'singleRow',
-            'detected_glyphs': len(glyphs),
-            'order': order
-        }
-        save_json(coords, meta, args.out)
-        if args.csv:
-            save_csv(coords, args.csv)
-        print(f"Saved {len(coords)} coords to {args.out}")
-        if args.csv:
-            print(f"CSV saved to {args.csv}")
-        return
-
-    # fallback: existing grid detection path (unchanged)
     grid = detect_sprite_grid(img, auto_cell=(not (args.cellW and args.cellH)))
     if args.cellW and args.cellH:
         grid['cellW'] = args.cellW
         grid['cellH'] = args.cellH
         grid['colsGuessCount'] = max(1, grid['imageWidth'] // grid['cellW'])
+
     coords = map_order_to_coords(order, grid)
     meta = {
         'image': args.image,
@@ -321,6 +207,7 @@ def main():
     save_json(coords, meta, args.out)
     if args.csv:
         save_csv(coords, args.csv)
+
     print(f"Saved {len(coords)} coords to {args.out}")
     if args.csv:
         print(f"CSV saved to {args.csv}")
