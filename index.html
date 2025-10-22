@@ -9,18 +9,36 @@
     <style>
         
         body { text-align: center; font-family: 'UnifrakturMaguntia', serif; padding: 20px; }
-        h1 { margin-bottom: 30px; font-family: 'UnifrakturMaguntia', serif; }
-        input { width: 300px; padding: 10px; margin-right: 10px; }
-        button { padding: 10px 15px; cursor: pointer; }
-        #canvas { border: 1px solid #ccc; margin-top: 30px; }
-        #downloadLink { display: block; margin-top: 20px; font-size: 1.2em; }
+        h1 { margin-bottom: 16px; font-family: 'UnifrakturMaguntia', serif; }
+        input, select { padding: 6px; margin: 6px; }
+        button { padding: 8px 12px; cursor: pointer; }
+        #canvas { border: 1px solid #ccc; margin-top: 12px; background:#fff; }
+        #downloadLink { display: block; margin-top: 12px; font-size: 1.0em; }
+        .controls { margin-bottom: 10px; }
+        .inline { display:inline-block; vertical-align:middle; }
     </style>
 </head>
 <body>
-    <h1>고딕체 텍스트 이미지 생성기</h1>
-    <input type="text" id="textInput" placeholder="텍스트를 입력하세요...">
-    <button id="generateBtn">이미지 생성</button>
-    <br>
+    <h1>고딕체 텍스트 이미지 생성기 (UnifrakturMaguntia)</h1>
+
+    <div class="controls">
+        <input type="text" id="textInput" placeholder="텍스트를 입력하세요..." value="Sample">
+        <button id="generateBtn">이미지 생성 (도트)</button>
+    </div>
+
+    <div class="controls">
+        <label class="inline">캔버스 가로:
+            <input type="number" id="canvasWidth" value="800" min="50" style="width:80px">
+        </label>
+        <label class="inline">세로:
+            <input type="number" id="canvasHeight" value="200" min="50" style="width:80px">
+        </label>
+        <label class="inline">도트 크기:
+            <input type="range" id="dotSize" min="2" max="40" value="8">
+            <span id="dotSizeVal">8</span>px
+        </label>
+    </div>
+
     <canvas id="canvas" width="800" height="200"></canvas>
     <br>
     <a id="downloadLink" style="display:none;">이미지 다운로드</a>
