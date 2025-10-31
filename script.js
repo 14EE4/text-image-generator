@@ -82,13 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Enter to generate
+    // Enter to generate → Ctrl+Enter로 변경
     if (input) {
         input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && e.ctrlKey) {
                 e.preventDefault();
                 triggerRender();
             }
+            // 일반 Enter는 그냥 줄바꿈 (기본 동작 유지)
         });
     }
 
