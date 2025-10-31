@@ -179,70 +179,94 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // layout (source-pixel units)
+            // 줄 분리
+            const lines = text.split('\n');
+            const visualGapNow = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value,10) : 1;
+            const lineGap = 2; // 줄 간격 (픽셀)
+
+            // 각 줄의 레이아웃 생성
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
             const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value,10) : avgSrcW;
-            const layout = [];
-            for (let i = 0; i < text.length; i++) {
-                const ch = text[i];
-                const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                if (ch === ' ') layout.push({ type: 'space', srcW: spaceSrcWidth });
-                else if (!g) layout.push({ type: 'empty', srcW: avgSrcW });
-                else layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
-            }
+            
+            const lineLayouts = [];
+            let maxLineW = 0;
+            let totalH = 0;
 
-            const visualGapNow = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value,10) : 1;
-            lastRenderLayout = { layout: layout, visualGap: visualGapNow };
-
-            // compute total source size including gaps
-            let totalW = 0; let maxH = 0;
-            for (const item of layout) {
-                totalW += item.srcW || 0;
-                if (item.srcH) maxH = Math.max(maxH, item.srcH);
-            }
-            if (layout.length > 1) totalW += (layout.length - 1) * visualGapNow;
-            if (totalW <= 0) totalW = 1;
-            if (maxH <= 0) maxH = coords.reduce((m,c)=>Math.max(m,c.h||0), 1);
-
-            // set canvas to source-pixel logical size and apply display scale
-            setCanvasSize(totalW, maxH);
-            ctx.clearRect(0,0,totalW, maxH);
-            ctx.imageSmoothingEnabled = false;
-            const displayScale = (displayScaleInput && !isNaN(Number(displayScaleInput.value))) ? parseInt(displayScaleInput.value,10) : 1;
-            canvas.style.width = Math.round(totalW * displayScale) + 'px';
-            canvas.style.height = Math.round(maxH * displayScale) + 'px';
-
-            // draw items tinted
-            let x = 0;
-            const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
-            for (let idx = 0; idx < layout.length; idx++) {
-                const item = layout[idx];
-                if (item.type === 'glyph') {
-                    drawTintedGlyphToCtx(item.g, ctx, x, 0, color);
-                    x += item.srcW || 0;
-                } else {
-                    x += item.srcW || 0;
+            for (const line of lines) {
+                const layout = [];
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
+                    if (ch === ' ') layout.push({ type: 'space', srcW: spaceSrcWidth });
+                    else if (!g) layout.push({ type: 'empty', srcW: avgSrcW });
+                    else layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
                 }
-                if (idx < layout.length - 1) x += visualGapNow;
+
+                let lineW = 0;
+                let lineH = 0;
+                for (const item of layout) {
+                    lineW += item.srcW || 0;
+                    if (item.srcH) lineH = Math.max(lineH, item.srcH);
+                }
+                if (layout.length > 1) lineW += (layout.length - 1) * visualGapNow;
+                if (lineH === 0) lineH = coords.reduce((m,c)=>Math.max(m,c.h||0), 1);
+
+                lineLayouts.push({ layout, width: lineW, height: lineH });
+                maxLineW = Math.max(maxLineW, lineW);
+                totalH += lineH;
             }
 
-            // update download link (filename from text)
+            // 줄 간격 추가
+            if (lineLayouts.length > 1) totalH += (lineLayouts.length - 1) * lineGap;
+
+            lastRenderLayout = { lineLayouts, visualGap: visualGapNow, lineGap };
+
+            // 캔버스 크기 설정
+            const canvasW = Math.max(1, maxLineW);
+            const canvasH = Math.max(1, totalH);
+            setCanvasSize(canvasW, canvasH);
+            ctx.clearRect(0, 0, canvasW, canvasH);
+            ctx.imageSmoothingEnabled = false;
+
+            const displayScale = (displayScaleInput && !isNaN(Number(displayScaleInput.value))) ? parseInt(displayScaleInput.value,10) : 1;
+            canvas.style.width = Math.round(canvasW * displayScale) + 'px';
+            canvas.style.height = Math.round(canvasH * displayScale) + 'px';
+
+            // 각 줄 그리기
+            const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
+            let yOffset = 0;
+
+            for (const lineInfo of lineLayouts) {
+                let x = 0;
+                for (let idx = 0; idx < lineInfo.layout.length; idx++) {
+                    const item = lineInfo.layout[idx];
+                    if (item.type === 'glyph') {
+                        drawTintedGlyphToCtx(item.g, ctx, x, yOffset, color);
+                        x += item.srcW || 0;
+                    } else {
+                        x += item.srcW || 0;
+                    }
+                    if (idx < lineInfo.layout.length - 1) x += visualGapNow;
+                }
+                yOffset += lineInfo.height + lineGap;
+            }
+
+            // 다운로드 링크 업데이트
             downloadLink.href = getTransparentDataURL(250);
             downloadLink.download = sanitizeFilename(text) + '.png';
             downloadLink.style.display = 'inline';
             downloadLink.textContent = '이미지 다운로드';
-            setStatus('Rendered (screen matches download) successfully');
+            setStatus('렌더링 완료 (여러 줄 지원)');
         } catch (err) {
             console.error('render error', err);
-            setStatus('Render error: see console', true);
+            setStatus('렌더 오류: 콘솔 확인', true);
         }
     }
 
     function getTransparentDataURL(threshold = 250) {
-        // helper: get selected tint color (if any)
         const selHex = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : null);
         const selRgb = selHex ? hexToRgb(selHex) : null;
-        const colorTolerance = 8; // 허용 오차 (픽셀/선택색 비교)
+        const colorTolerance = 8;
 
         function closeToSelected(r,g,b) {
             if (!selRgb) return false;
@@ -251,31 +275,36 @@ document.addEventListener('DOMContentLoaded', () => {
                    Math.abs(b - selRgb.b) <= colorTolerance;
         }
 
-        if (lastRenderLayout && lastRenderLayout.layout && lastRenderLayout.layout.length) {
-            const layout = lastRenderLayout.layout;
+        if (lastRenderLayout && lastRenderLayout.lineLayouts && lastRenderLayout.lineLayouts.length) {
+            const lineLayouts = lastRenderLayout.lineLayouts;
             const visualGap = lastRenderLayout.visualGap || 0;
-            // compute total source width and max height (including visual gaps)
-            let totalW = 0;
-            let maxH = 0;
-            for (const item of layout) {
-                totalW += item.srcW || 0;
-                if (item.srcH) maxH = Math.max(maxH, item.srcH);
-            }
-            if (layout.length > 1) totalW += (layout.length - 1) * visualGap;
-            if (totalW > 0 && maxH > 0) {
-                const tmp = document.createElement('canvas');
-                tmp.width = totalW;
-                tmp.height = maxH;
-                const tctx = tmp.getContext('2d');
-                tctx.imageSmoothingEnabled = false;
+            const lineGap = lastRenderLayout.lineGap || 2;
 
+            let maxW = 0;
+            let totalH = 0;
+            for (const lineInfo of lineLayouts) {
+                maxW = Math.max(maxW, lineInfo.width);
+                totalH += lineInfo.height;
+            }
+            if (lineLayouts.length > 1) totalH += (lineLayouts.length - 1) * lineGap;
+
+            if (maxW <= 0 || totalH <= 0) return canvas.toDataURL('image/png');
+
+            const tmp = document.createElement('canvas');
+            tmp.width = maxW;
+            tmp.height = totalH;
+            const tctx = tmp.getContext('2d');
+            tctx.imageSmoothingEnabled = false;
+
+            const color = selHex || '#000000';
+            let yOffset = 0;
+
+            for (const lineInfo of lineLayouts) {
                 let x = 0;
-                const color = selHex || '#000000';
-                for (let idx = 0; idx < layout.length; idx++) {
-                    const item = layout[idx];
+                for (let idx = 0; idx < lineInfo.layout.length; idx++) {
+                    const item = lineInfo.layout[idx];
                     if (item.type === 'glyph') {
                         const g = item.g;
-                        // tint glyph into tintOff then blit
                         tintOff.width = g.w; tintOff.height = g.h;
                         tintOffCtx.clearRect(0,0,g.w,g.h);
                         tintOffCtx.drawImage(spriteImg, g.sx, g.sy, g.w, g.h, 0, 0, g.w, g.h);
@@ -287,29 +316,30 @@ document.addEventListener('DOMContentLoaded', () => {
                             d[pi] = rgb.r; d[pi+1] = rgb.g; d[pi+2] = rgb.b;
                         }
                         tintOffCtx.putImageData(img, 0, 0);
-                        tctx.drawImage(tintOff, 0, 0, g.w, g.h, x, 0, g.w, g.h);
+                        tctx.drawImage(tintOff, 0, 0, g.w, g.h, x, yOffset, g.w, g.h);
                         x += g.w;
                     } else {
                         x += item.srcW || 0;
                     }
-                    if (idx < layout.length - 1) x += visualGap;
+                    if (idx < lineInfo.layout.length - 1) x += visualGap;
                 }
-
-                // white->transparent but skip pixels that match selected tint color
-                const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
-                const dAll = imgAll.data;
-                for (let i = 0; i < dAll.length; i += 4) {
-                    const r = dAll[i], g = dAll[i+1], b = dAll[i+2], a = dAll[i+3];
-                    if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
-                        if (!closeToSelected(r,g,b)) dAll[i+3] = 0;
-                    }
-                }
-                tctx.putImageData(imgAll, 0, 0);
-                return tmp.toDataURL('image/png');
+                yOffset += lineInfo.height + lineGap;
             }
+
+            // 흰색→투명 변환 (선택 색상 제외)
+            const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
+            const dAll = imgAll.data;
+            for (let i = 0; i < dAll.length; i += 4) {
+                const r = dAll[i], g = dAll[i+1], b = dAll[i+2], a = dAll[i+3];
+                if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
+                    if (!closeToSelected(r,g,b)) dAll[i+3] = 0;
+                }
+            }
+            tctx.putImageData(imgAll, 0, 0);
+            return tmp.toDataURL('image/png');
         }
 
-        // Fallback: export visible canvas (CSS size), same protection applied
+        // Fallback
         try {
             const rect = canvas.getBoundingClientRect();
             const outW = Math.max(1, Math.round(rect.width));
@@ -335,15 +365,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // wire up buttons
-    if (btn) btn.addEventListener('click', () => {
-        console.log('Generate button clicked');
-        triggerRender();
-    });
-    if (downloadLink) downloadLink.style.display = 'none';
-
-    // initial load & render
+    // 초기 리소스 로드
     loadResources().then(() => {
+        setStatus('대기 중...');
+        // 기본 텍스트 렌더링
         triggerRender();
     });
 });
