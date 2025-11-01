@@ -11,43 +11,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const letterSpacingVal = document.getElementById('letterSpacingVal');
     const spaceWidthInput = document.getElementById('spaceWidth');
     const spaceWidthVal = document.getElementById('spaceWidthVal');
-
+    // line spacing control
+    const lineSpacingInput = document.getElementById('lineSpacing');
+    const lineSpacingVal = document.getElementById('lineSpacingVal');
+ 
     // display scale control
     const displayScaleInput = document.getElementById('displayScale');
     const displayScaleVal = document.getElementById('displayScaleVal');
-
+ 
     // color controls (picker + hex input)
     const colorPicker = document.getElementById('colorPicker');
     const colorHex = document.getElementById('colorHex');
-
-    // status banner
-    const status = document.createElement('div');
-    status.id = 'statusBanner';
-    status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
-    if (canvas && canvas.parentNode) canvas.parentNode.insertBefore(status, canvas);
-    function setStatus(msg, isError = false) {
-        status.textContent = msg;
-        status.style.color = isError ? '#a00' : '#080';
-        console.log('[STATUS]', msg);
-    }
-
-    function normalizeHex(v) {
-        if (!v) return '#000000';
-        v = v.trim();
-        if (!v) return '#000000';
-        if (v[0] !== '#') v = '#' + v;
-        if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
-        return '#000000';
-    }
-    function hexToRgb(hex) {
-        hex = normalizeHex(hex).slice(1);
-        return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) };
-    }
-
+ 
     // initialize UI displays
     if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
     if (letterSpacingInput && letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value;
     if (spaceWidthInput && spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+    if (lineSpacingInput && lineSpacingVal) lineSpacingVal.textContent = lineSpacingInput.value;
     if (colorPicker && colorHex) {
         colorHex.value = normalizeHex(colorPicker.value || colorHex.value);
         colorPicker.value = normalizeHex(colorHex.value);
@@ -68,6 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (spaceWidthInput) spaceWidthInput.addEventListener('input', () => {
         if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value;
+        triggerRender();
+    });
+    if (lineSpacingInput) lineSpacingInput.addEventListener('input', () => {
+        if (lineSpacingVal) lineSpacingVal.textContent = lineSpacingInput.value;
         triggerRender();
     });
     if (colorPicker && colorHex) {
@@ -183,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 줄 분리
             const lines = text.split('\n');
             const visualGapNow = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value,10) : 1;
-            const lineGap = 2; // 줄 간격 (픽셀)
+            const lineGap = (lineSpacingInput && !isNaN(Number(lineSpacingInput.value))) ? parseInt(lineSpacingInput.value,10) : 2;
 
             // 각 줄의 레이아웃 생성
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));

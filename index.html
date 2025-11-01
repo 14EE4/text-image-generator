@@ -21,7 +21,6 @@
         <button id="generateBtn">생성</button>
         <small style="display:block;color:#666;margin-top:4px;">💡 Ctrl+Enter로 생성 | Enter는 줄바꿈</small>
 
-        <!-- 기존 슬라이더들 -->
         <div style="margin-top:8px; display:inline-block; text-align:left;">
             <label style="font-size:13px; margin-right:8px;">
                 글자간격: <strong id="letterSpacingVal">1</strong>px
@@ -34,14 +33,16 @@
             <input id="spaceWidth" type="range" min="0" max="50" value="8" style="vertical-align:middle;">
             <br>
             <label style="font-size:13px; margin-right:8px;">
-                화면 배율(Display scale): <strong id="displayScaleVal">2</strong>x
+                줄 간격: <strong id="lineSpacingVal">2</strong>px
+            </label>
+            <input id="lineSpacing" type="range" min="0" max="40" value="2" style="vertical-align:middle;">
+            <br>
+            <label style="font-size:13px; margin-right:8px;">
+                화면 배율: <strong id="displayScaleVal">2</strong>x
             </label>
             <input id="displayScale" type="range" min="1" max="6" value="2" step="1" style="vertical-align:middle;">
             <br>
-            <!-- color controls -->
-            <label style="font-size:13px; margin-right:8px;">
-                색상:
-            </label>
+            <label style="font-size:13px; margin-right:8px;">색상:</label>
             <input id="colorPicker" type="color" value="#000000" style="vertical-align:middle;">
             <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000" style="width:90px;margin-left:6px;">
         </div>
