@@ -22,6 +22,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // color controls (picker + hex input)
     const colorPicker = document.getElementById('colorPicker');
     const colorHex = document.getElementById('colorHex');
+
+    // status banner
+    const status = document.createElement('div');
+    status.id = 'statusBanner';
+    status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
+    if (canvas && canvas.parentNode) canvas.parentNode.insertBefore(status, canvas);
+    function setStatus(msg, isError = false) {
+        status.textContent = msg;
+        status.style.color = isError ? '#a00' : '#080';
+        console.log('[STATUS]', msg);
+    }
+
+    function normalizeHex(v) {
+        if (!v) return '#000000';
+        v = v.trim();
+        if (!v) return '#000000';
+        if (v[0] !== '#') v = '#' + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+        return '#000000';
+    }
+    function hexToRgb(hex) {
+        hex = normalizeHex(hex).slice(1);
+        return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) };
+    }
  
     // initialize UI displays
     if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
@@ -350,10 +374,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // wire up button
+    if (btn) btn.addEventListener('click', () => {
+        console.log('Generate button clicked');
+        triggerRender();
+    });
+
     // 초기 리소스 로드
     loadResources().then(() => {
         setStatus('대기 중...');
         // 기본 텍스트 렌더링
-        triggerRender();
+        if (input && input.value.trim()) triggerRender();
     });
 });
