@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 폰트 설정
   const FONTS = {
-    english_old2: {
-      coords: './coords.json',
-      sprite: './english_old2.png',
+    english_old: {
+      coords: './sprite_fonts/english_old/coords.json',
+      sprite: './sprite_fonts/english_old/english_old.png',
       cellH: 18,
       defaultSpaceWidth: 4,
       defaultDisplayScale: 2
