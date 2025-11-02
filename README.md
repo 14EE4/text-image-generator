@@ -2,7 +2,7 @@
 
 픽셀 폰트 스프라이트를 사용하여 텍스트를 투명 배경 PNG 이미지로 변환하는 웹 도구입니다.
 
-> 🤖 이 프로젝트는 GitHub Copilot(GPT-5)와 Claude 3.5 Sonnet의 도움으로 제작되었습니다.
+> 🤖 이 프로젝트는 GitHub Copilot (GPT-5, Claude 3.5 Sonnet)의 도움으로 제작되었습니다.
 
 ## ✨ 주요 기능
 
@@ -88,23 +88,6 @@ text-image-generator/
 }
 ```
 
-## 🔧 새 폰트 추가
-
-1) sprite_fonts/your_font/{sprite.png, coords.json} 추가  
-2) js/fonts.js에 등록
-```javascript
-export const FONTS = {
-  your_font: {
-    coords: './sprite_fonts/your_font/coords.json',
-    sprite: './sprite_fonts/your_font/sprite.png',
-    cellH: 18,
-    defaultSpaceWidth: 4,
-    defaultDisplayScale: 2
-  }
-};
-```
-3) index.html, xp_theme/index.html, 98_theme/index.html의 폰트 선택 옵션 추가
-
 ## 🎯 주요 클래스
 
 - FontLoader(statusCallback, basePath='./')
@@ -133,4 +116,4 @@ MIT
 최종 업데이트: 2025-11-02  
 테마: 기본 + Windows XP + Windows 98  
 렌더링: Canvas 2D + ImageData API  
-AI Assisted: GitHub Copilot (GPT-5), Claude 3.5 Sonnet
+AI Assisted: GitHub Copilot (GPT-5, Claude 3.5 Sonnet)
