@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>텍스트 이미지 변환기</title>
+  <link rel="stylesheet" href="https://unpkg.com/xp.css">
+  <style>
+    body { 
+      padding: 20px; 
+      background: #3a6ea5;
+      font-family: "Tahoma", sans-serif;
+    }
+    .window {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .window-body {
+      margin: 0;
+      padding: 12px;
+    }
+    .controls {
+      margin-bottom: 12px;
+    }
+    .field-row {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+    }
+    .field-row label {
+      width: 80px;
+      margin-right: 8px;
+    }
+    .field-row strong {
+      min-width: 30px;
+      text-align: right;
+      display: inline-block;
+      margin-left: 4px;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      resize: vertical;
+      font-family: "Fixedsys", monospace;
+      box-sizing: border-box;
+    }
+    #canvas {
+      display: block;
+      margin: 12px auto;
+      image-rendering: pixelated;
+      border: 2px solid #808080;
+      background: white;
+    }
+    .button-row {
+      text-align: center;
+      margin: 12px 0;
+    }
+    .status-bar {
+      margin-top: 12px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: "Tahoma", sans-serif;
+    }
+    #colorHex {
+      width: 90px;
+      margin-left: 6px;
+    }
+    select {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="title-bar">
+      <div class="title-bar-text">텍스트 이미지 변환기</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize"></button>
+        <button aria-label="Maximize"></button>
+        <button aria-label="Close"></button>
+      </div>
+    </div>
+    
+    <div class="window-body">
+      <div class="controls">
+        <fieldset>
+          <legend>설정</legend>
+          
+          <div class="field-row">
+            <label for="fontSelect">폰트:</label>
+            <select id="fontSelect">
+              <option value="english_old">English Old (18px)</option>
+              <option value="smallest_font">Smallest Font (5px)</option>
+            </select>
+          </div>
+          
+          <div class="field-row" style="display: block; margin-top: 12px;">
+            <label for="textInput">텍스트:</label>
+            <textarea id="textInput" placeholder="여러 줄 입력 가능&#13;&#10;Ctrl+Enter로 생성"></textarea>
+          </div>
+          
+          <div class="field-row">
+            <label>글자간격:</label>
+            <input id="letterSpacing" type="range" min="0" max="10" value="1" style="flex: 1;">
+            <strong id="letterSpacingVal">1</strong>px
+          </div>
+          
+          <div class="field-row">
+            <label>공백 너비:</label>
+            <input id="spaceWidth" type="range" min="0" max="50" value="4" style="flex: 1;">
+            <strong id="spaceWidthVal">4</strong>px
+          </div>
+          
+          <div class="field-row">
+            <label>줄 간격:</label>
+            <input id="lineSpacing" type="range" min="0" max="40" value="1" style="flex: 1;">
+            <strong id="lineSpacingVal">1</strong>px
+          </div>
+          
+          <div class="field-row">
+            <label>화면 배율:</label>
+            <input id="displayScale" type="range" min="1" max="6" value="2" step="1" style="flex: 1;">
+            <strong id="displayScaleVal">2</strong>x
+          </div>
+          
+          <div class="field-row">
+            <label>색상:</label>
+            <input id="colorPicker" type="color" value="#000000">
+            <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000">
+          </div>
+        </fieldset>
+      </div>
+      
+      <div class="button-row">
+        <button id="generateBtn">생성 (Ctrl+Enter)</button>
+        <a id="downloadLink" style="display:none; margin-left: 8px;"></a>
+      </div>
+      
+      <div style="text-align: center;">
+        <canvas id="canvas" width="800" height="200"></canvas>
+      </div>
+      
+      <div class="status-bar">
+        <p class="status-bar-field" id="statusBanner">준비</p>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
