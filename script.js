@@ -277,12 +277,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = (input.value || '').replace(/\r\n/g, '\n');
     const lines = text.split('\n');
 
-    const H = 18; // 한 줄 높이
-    const gapRaw = parseInt((lineSpacingInput && lineSpacingInput.value) || '0', 10) || 0;
-    const lineGap = Math.max(0, gapRaw); // 음수 차단
+    const lineGap = getLineGap();        // 기본 1
+    const spaceW  = getSpaceWidth();     // 기본 4
+
+    // 줄 높이
+    const H = 18;
+
+    // 예: 줄 단어 폭 계산 시
+    // const widths = lines.map(line => { let w=0; for (const ch of line) w += (ch===' ')? spaceW : (cmap[ch]?.w ?? 8); return w; });
+
+    // 예: 줄 배치 y 누적
+    // y += H; if (li < lines.length - 1) y += lineGap;
 
     // 각 줄 폭 계산
-    const spaceW = 8;
     const widths = lines.map(line => {
       let w = 0;
       for (let i = 0; i < line.length; i++) {
