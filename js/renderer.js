@@ -78,12 +78,16 @@ export class GlyphRenderer {
 
     this.lastRenderLayout = { lineLayouts, visualGap, lineGap };
 
+    // 내부 해상도는 실제 픽셀 크기로
     setCanvasSize(this.canvas, this.ctx, maxLineW || 1, totalH || fixedH);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
 
-    this.canvas.style.width = Math.round((maxLineW || 1) * displayScale) + 'px';
-    this.canvas.style.height = Math.round((totalH || fixedH) * displayScale) + 'px';
+    // CSS는 displayScale 적용 (정수 배율만 사용하여 픽셀 퍼펙트 유지)
+    const displayW = (maxLineW || 1) * displayScale;
+    const displayH = (totalH || fixedH) * displayScale;
+    this.canvas.style.width = displayW + 'px';
+    this.canvas.style.height = displayH + 'px';
 
     let yOffset = 0;
     for (let lineIdx = 0; lineIdx < lineLayouts.length; lineIdx++) {

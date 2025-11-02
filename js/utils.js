@@ -22,11 +22,11 @@ export function sanitizeFilename(text) {
 }
 
 export function setCanvasSize(canvas, ctx, w, h) {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.floor(w * dpr));
-  canvas.height = Math.max(1, Math.floor(h * dpr));
+  // DPR 사용하지 않고 1:1 픽셀 매칭
+  canvas.width = Math.max(1, w);
+  canvas.height = Math.max(1, h);
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
 }
