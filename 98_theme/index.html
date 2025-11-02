@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>텍스트 이미지 변환기 · 98 테마</title>
+  <link rel="stylesheet" href="https://unpkg.com/xp.css@/dist/98.css">
+  <style>
+    body {
+      padding: 16px;
+      background: #008080;
+      font-family: "MS Sans Serif", Tahoma, sans-serif;
+    }
+    .window {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .window-body {
+      padding: 10px;
+    }
+    .field-row { margin-bottom: 8px; align-items: center; }
+    .field-row label { width: 90px; margin-right: 8px; display: inline-block; }
+    .field-row strong { min-width: 30px; text-align: right; display: inline-block; margin-left: 4px; }
+    textarea {
+      width: 100%;
+      height: 60px;
+      resize: vertical;
+      font-family: "Fixedsys", monospace;
+      box-sizing: border-box;
+    }
+    .button-row { text-align: center; margin: 10px 0; }
+    .canvas-container { text-align: center; margin: 10px 0; line-height: 0; }
+    #canvas {
+      display: inline-block;
+      image-rendering: pixelated;
+      background: #fff;
+      border: 2px groove #c0c0c0;
+      vertical-align: top;
+    }
+    .status-bar { margin-top: 10px; }
+    .theme-switcher { text-align: center; margin-bottom: 12px; }
+    #colorHex { width: 90px; margin-left: 6px; }
+    select { min-width: 200px; }
+  </style>
+</head>
+<body>
+  <div class="theme-switcher">
+    <button onclick="location.href='../'">📄 기본 테마로</button>
+    <button onclick="location.href='../xp_theme/'">🪟 XP 테마로</button>
+  </div>
+
+  <div class="window">
+    <div class="title-bar">
+      <div class="title-bar-text">텍스트 이미지 변환기 (Windows 98 스타일)</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize"></button>
+        <button aria-label="Maximize"></button>
+        <button aria-label="Close"></button>
+      </div>
+    </div>
+
+    <div class="window-body">
+      <fieldset>
+        <legend>설정</legend>
+
+        <div class="field-row">
+          <label for="fontSelect">폰트:</label>
+          <select id="fontSelect">
+            <option value="english_old">English Old (18px)</option>
+            <option value="smallest_font">Smallest Font (5px)</option>
+          </select>
+        </div>
+
+        <div class="field-row" style="display:block; margin-top:8px;">
+          <label for="textInput">텍스트:</label>
+          <textarea id="textInput" placeholder="여러 줄 입력 가능&#13;&#10;Ctrl+Enter로 생성"></textarea>
+        </div>
+
+        <div class="field-row">
+          <label>글자간격:</label>
+          <input id="letterSpacing" type="range" min="0" max="10" value="1" style="flex:1;">
+          <strong id="letterSpacingVal">1</strong>px
+        </div>
+
+        <div class="field-row">
+          <label>공백 너비:</label>
+          <input id="spaceWidth" type="range" min="0" max="50" value="4" style="flex:1;">
+          <strong id="spaceWidthVal">4</strong>px
+        </div>
+
+        <div class="field-row">
+          <label>줄 간격:</label>
+          <input id="lineSpacing" type="range" min="0" max="40" value="1" style="flex:1;">
+          <strong id="lineSpacingVal">1</strong>px
+        </div>
+
+        <div class="field-row">
+          <label>화면 배율:</label>
+          <input id="displayScale" type="range" min="1" max="6" value="2" step="1" style="flex:1;">
+          <strong id="displayScaleVal">2</strong>x
+        </div>
+
+        <div class="field-row">
+          <label>색상:</label>
+          <input id="colorPicker" type="color" value="#000000">
+          <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000">
+        </div>
+      </fieldset>
+
+      <div class="button-row">
+        <button id="generateBtn">생성 (Ctrl+Enter)</button>
+        <a id="downloadLink" style="display:none; margin-left:8px;"></a>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="canvas" width="800" height="200"></canvas>
+      </div>
+
+      <div class="status-bar">
+        <p class="status-bar-field" id="statusBanner">준비</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 98 테마는 xp_theme의 스크립트를 재사용하여 basePath('../') 로드 -->
+  <script type="module" src="../xp_theme/script.js"></script>
+</body>
+</html>
