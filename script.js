@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 각 줄의 레이아웃 생성
             const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
             const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value,10) : avgSrcW;
+            const fixedH = 18; // coords.json meta.cellH 값 (모든 글자 높이 고정)
             
             const lineLayouts = [];
             let maxLineW = 0;
@@ -206,19 +207,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let i = 0; i < line.length; i++) {
                     const ch = line[i];
                     const g = coordsMap[ch] || coordsMap[ch.toUpperCase()] || coordsMap[ch.toLowerCase()];
-                    if (ch === ' ') layout.push({ type: 'space', srcW: spaceSrcWidth });
-                    else if (!g) layout.push({ type: 'empty', srcW: avgSrcW });
-                    else layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: g.h });
+                    if (ch === ' ') layout.push({ type: 'space', srcW: spaceSrcWidth, srcH: fixedH });
+                    else if (!g) layout.push({ type: 'empty', srcW: avgSrcW, srcH: fixedH });
+                    else layout.push({ type: 'glyph', g: g, srcW: g.w, srcH: fixedH });
                 }
 
                 let lineW = 0;
-                let lineH = 0;
+                let lineH = fixedH; // 모든 줄 높이를 18로 고정
                 for (const item of layout) {
                     lineW += item.srcW || 0;
-                    if (item.srcH) lineH = Math.max(lineH, item.srcH);
                 }
                 if (layout.length > 1) lineW += (layout.length - 1) * visualGapNow;
-                if (lineH === 0) lineH = coords.reduce((m,c)=>Math.max(m,c.h||0), 1);
 
                 lineLayouts.push({ layout, width: lineW, height: lineH });
                 maxLineW = Math.max(maxLineW, lineW);
