@@ -10,73 +10,41 @@
       background: #3a6ea5;
       font-family: "Tahoma", sans-serif;
     }
-    .window {
-      max-width: 600px;
-      margin: 0 auto;
+    .window { max-width: 600px; margin: 0 auto; }
+    .window-body { margin: 0; padding: 12px; }
+    .controls { margin-bottom: 12px; }
+    .field-row { margin-bottom: 8px; display: flex; align-items: center; }
+    .field-row label { width: 80px; margin-right: 8px; }
+    .field-row strong { min-width: 30px; text-align: right; display: inline-block; margin-left: 4px; }
+    textarea { width: 100%; height: 60px; resize: vertical; font-family: "Fixedsys", monospace; box-sizing: border-box; }
+    .canvas-container { text-align: center; margin: 12px 0; line-height: 0; }
+    #canvas { display: inline-block; margin: 0; image-rendering: pixelated; border: 2px solid #808080; background: white; vertical-align: top; }
+    .button-row { text-align: center; margin: 12px 0; }
+    .status-bar { margin-top: 12px; padding: 4px 8px; font-size: 11px; font-family: "Tahoma", sans-serif; }
+    #colorHex { width: 90px; margin-left: 6px; }
+    select { flex: 1; }
+
+    /* 98 테마와 동일한 상단 고정 테마 스위처 */
+    .theme-switcher {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 1000;
     }
-    .window-body {
-      margin: 0;
-      padding: 12px;
+    .theme-switcher button {
+      padding: 6px 10px;
+      font-size: 13px;
+      cursor: pointer;
     }
-    .controls {
-      margin-bottom: 12px;
-    }
-    .field-row {
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-    }
-    .field-row label {
-      width: 80px;
-      margin-right: 8px;
-    }
-    .field-row strong {
-      min-width: 30px;
-      text-align: right;
-      display: inline-block;
-      margin-left: 4px;
-    }
-    textarea {
-      width: 100%;
-      height: 60px;
-      resize: vertical;
-      font-family: "Fixedsys", monospace;
-      box-sizing: border-box;
-    }
-    .canvas-container {
-      text-align: center;
-      margin: 12px 0;
-      line-height: 0;
-    }
-    #canvas {
-      display: inline-block;
-      margin: 0;
-      image-rendering: pixelated;
-      border: 2px solid #808080;
-      background: white;
-      vertical-align: top;
-    }
-    .button-row {
-      text-align: center;
-      margin: 12px 0;
-    }
-    .status-bar {
-      margin-top: 12px;
-      padding: 4px 8px;
-      font-size: 11px;
-      font-family: "Tahoma", sans-serif;
-    }
-    #colorHex {
-      width: 90px;
-      margin-left: 6px;
-    }
-    select {
-      flex: 1;
-    }
-    /* 상단 고정 테마 스위처 제거 */
   </style>
 </head>
 <body>
+  <!-- 상단 고정 이동 버튼 (창 바깥) -->
+  <div class="theme-switcher">
+    <button onclick="location.href='../'">📄 기본 테마</button>
+    <button onclick="location.href='../98_theme/'" style="margin-left:6px;">🖥️ 98 테마</button>
+  </div>
+
   <div class="window">
     <div class="title-bar">
       <div class="title-bar-text">텍스트 이미지 변환기</div>
@@ -88,16 +56,7 @@
     </div>
     
     <div class="window-body">
-
-      <!-- XP 스타일 테마 전환 버튼 -->
-      <fieldset style="margin-bottom: 10px;">
-        <legend>테마 전환</legend>
-        <div class="field-row" style="gap: 8px;">
-          <button onclick="location.href='../'">📄 기본 테마</button>
-          <button class="default" onclick="location.href='../98_theme/'">🖥️ 98 테마</button>
-        </div>
-      </fieldset>
-
+      <!-- 내부 fieldset 전환 버튼 블록 제거 -->
       <div class="controls">
         <fieldset>
           <legend>설정</legend>
