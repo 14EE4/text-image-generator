@@ -1,64 +1,52 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>중앙 정렬</title>
+  <meta charset="UTF-8">
+  <title>텍스트 이미지 변환기</title>
   <style>
-    html, body { height: 100%; margin: 0; }
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;      /* 가로 가운데 */
-      justify-content: center;  /* 세로 가운데 (전체 묶음) */
-      gap: 12px;
-      text-align: center;       /* 텍스트 가운데 */
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-    }
-    .container {
-      width: 100%;
-      max-width: 800px;
-      padding: 16px;
-      box-sizing: border-box;
-    }
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding:16px; text-align: center; }
     .controls { margin-bottom:10px; }
     textarea { width:420px; height:120px; resize:vertical; }
     label { font-size:13px; margin-right:8px; }
-    /* 캔버스를 페이지 중앙에 */
+    select { padding: 4px 8px; margin: 6px; font-size: 13px; }
     #canvas { display:block; margin:12px auto; image-rendering: pixelated; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="controls">
-      <textarea id="textInput" placeholder="여러 줄 입력 가능"></textarea>
-      <button id="generateBtn">생성</button>
-      <small style="display:block;color:#666;margin-top:4px;">Ctrl+Enter로 생성 · Enter는 줄바꿈</small>
-      <div style="margin-top:8px; display:inline-block; text-align:left;">
-        <label>글자간격: <strong id="letterSpacingVal">1</strong>px</label>
-        <input id="letterSpacing" type="range" min="0" max="10" value="1">
-        <br>
-        <label>공백 너비(export): <strong id="spaceWidthVal">8</strong>px</label>
-        <input id="spaceWidth" type="range" min="0" max="50" value="4">
-        <br>
-        <label>줄 간격: <strong id="lineSpacingVal">0</strong>px</label>
-        <!-- 줄 간격 슬라이더가 있다면 min을 0으로 -->
-        <input id="lineSpacing" type="range" min="0" max="40" value="1">
-        <!-- 음수 값으로 내부 패딩 보정 가능 -->
-        <br>
-        <label>화면 배율: <strong id="displayScaleVal">2</strong>x</label>
-        <input id="displayScale" type="range" min="1" max="6" value="2" step="1">
-        <br>
-        <label>색상:</label>
-        <input id="colorPicker" type="color" value="#000000">
-        <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000" style="width:90px;margin-left:6px;">
-      </div>
+  <div class="controls">
+    <div style="margin-bottom:8px;">
+      <label>폰트 선택:</label>
+      <select id="fontSelect">
+        <option value="english_old2">English Old 2 (18px)</option>
+        <option value="smallest_font">Smallest Font (5px)</option>
+      </select>
     </div>
-
-    <canvas id="canvas" width="800" height="200"></canvas>
-    <a id="downloadLink" style="display:none;">이미지 다운로드</a>
+    
+    <textarea id="textInput" placeholder="여러 줄 입력 가능"></textarea>
+    <button id="generateBtn">생성</button>
+    <small style="display:block;color:#666;margin-top:4px;">Ctrl+Enter로 생성 · Enter는 줄바꿈</small>
+    
+    <div style="margin-top:8px; display:inline-block; text-align:left;">
+      <label>글자간격: <strong id="letterSpacingVal">1</strong>px</label>
+      <input id="letterSpacing" type="range" min="0" max="10" value="1">
+      <br>
+      <label>공백 너비: <strong id="spaceWidthVal">4</strong>px</label>
+      <input id="spaceWidth" type="range" min="0" max="50" value="4">
+      <br>
+      <label>줄 간격: <strong id="lineSpacingVal">1</strong>px</label>
+      <input id="lineSpacing" type="range" min="0" max="40" value="1">
+      <br>
+      <label>화면 배율: <strong id="displayScaleVal">2</strong>x</label>
+      <input id="displayScale" type="range" min="1" max="6" value="2" step="1">
+      <br>
+      <label>색상:</label>
+      <input id="colorPicker" type="color" value="#000000">
+      <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000" style="width:90px;margin-left:6px;">
+    </div>
   </div>
 
+  <canvas id="canvas" width="800" height="200"></canvas>
+  <a id="downloadLink" style="display:none;">이미지 다운로드</a>
   <script src="./script.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('textInput');
   const btn = document.getElementById('generateBtn');
   const downloadLink = document.getElementById('downloadLink');
+  const fontSelect = document.getElementById('fontSelect');
 
   const letterSpacingInput = document.getElementById('letterSpacing');
   const letterSpacingVal = document.getElementById('letterSpacingVal');
@@ -16,6 +17,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const displayScaleVal = document.getElementById('displayScaleVal');
   const colorPicker = document.getElementById('colorPicker');
   const colorHex = document.getElementById('colorHex');
+
+  // 폰트 설정
+  const FONTS = {
+    english_old2: {
+      coords: './coords.json',
+      sprite: './english_old2.png',
+      cellH: 18
+    },
+    smallest_font: {
+      coords: './sprite_fonts/smallest_font/smallest_coords.json',
+      sprite: './sprite_fonts/smallest_font/smallest-font.png',
+      cellH: 5
+    }
+  };
 
   // 상태 배너
   const status = document.createElement('div');
@@ -67,32 +82,40 @@ document.addEventListener('DOMContentLoaded', () => {
   let coordsMap = {};
   const spriteImg = new Image();
 
-  async function loadResources() {
+  async function loadResources(fontKey) {
+    const fontConfig = FONTS[fontKey];
+    if (!fontConfig) {
+      setStatus('알 수 없는 폰트', true);
+      return;
+    }
+
     try {
-      const res = await fetch('./coords.json');
-      if (!res.ok) throw new Error(`coords.json fetch failed: ${res.status}`);
+      const res = await fetch(fontConfig.coords);
+      if (!res.ok) throw new Error(`coords fetch failed: ${res.status}`);
       const payload = await res.json();
-      meta = payload.meta || meta;
+      meta = payload.meta || { cellH: fontConfig.cellH };
+      meta.cellH = fontConfig.cellH; // 고정값 사용
       coords = payload.coords || [];
       coordsMap = {};
       for (const c of coords) if (c && c.char !== undefined) coordsMap[c.char] = c;
-      setStatus(`coords.json loaded (${coords.length})`);
+      setStatus(`${fontKey} coords loaded (${coords.length})`);
     } catch (e) {
       console.error(e);
-      setStatus(`coords.json load failed: ${e.message}`, true);
+      setStatus(`${fontKey} coords load failed: ${e.message}`, true);
       coords = []; coordsMap = {};
     }
+
     return new Promise((resolve) => {
       spriteImg.onload = () => {
-        setStatus(`sprite loaded: ${spriteImg.naturalWidth}x${spriteImg.naturalHeight}`);
+        setStatus(`${fontKey} sprite loaded: ${spriteImg.naturalWidth}x${spriteImg.naturalHeight}`);
         resolve();
       };
       spriteImg.onerror = (ev) => {
         console.warn('sprite load error', ev);
-        setStatus('sprite load failed', true);
+        setStatus(`${fontKey} sprite load failed`, true);
         resolve();
       };
-      spriteImg.src = './english_old2.png';
+      spriteImg.src = fontConfig.sprite;
     });
   }
 
@@ -101,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const tintOffCtx = tintOff.getContext('2d');
 
   function drawTintedGlyphToCtx(g, destCtx, dx, dy, colorHex, fixedH) {
-    const w = g.w; const h = fixedH; // 높이는 18로 고정
+    const w = g.w; const h = fixedH;
     tintOff.width = w; tintOff.height = h;
     tintOffCtx.clearRect(0,0,w,h);
     tintOffCtx.drawImage(spriteImg, g.sx, g.sy || 0, w, h, 0, 0, w, h);
@@ -133,9 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const lines = (text || '').replace(/\r\n/g, '\n').split('\n');
       const visualGap = (letterSpacingInput && !isNaN(Number(letterSpacingInput.value))) ? parseInt(letterSpacingInput.value,10) : 1;
-      const lineGap = (lineSpacingInput && !isNaN(Number(lineSpacingInput.value))) ? parseInt(lineSpacingInput.value,10) : 0;
+      const lineGap = (lineSpacingInput && !isNaN(Number(lineSpacingInput.value))) ? parseInt(lineSpacingInput.value,10) : 1;
       const avgSrcW = Math.max(1, Math.round(coords.reduce((s,c)=>s + (c.w||0),0) / Math.max(1, coords.length)));
-      const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value,10) : avgSrcW;
+      const spaceSrcWidth = (spaceWidthInput && !isNaN(Number(spaceWidthInput.value))) ? parseInt(spaceWidthInput.value,10) : 4;
 
       const lineLayouts = [];
       let maxLineW = 0;
@@ -252,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
       }
 
-      // 흰색 배경만 투명 처리 (선택 색상과 유사한 픽셀은 유지)
       const imgAll = tctx.getImageData(0,0,tmp.width,tmp.height);
       const dAll = imgAll.data;
       for (let i = 0; i < dAll.length; i += 4) {
@@ -265,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return tmp.toDataURL('image/png');
     }
 
-    // Fallback: 현재 캔버스 스냅샷
     return canvas.toDataURL('image/png');
   }
 
@@ -273,66 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderUsingGlyphs(input ? (input.value || '') : '');
   }
 
-  function render() {
-    const text = (input.value || '').replace(/\r\n/g, '\n');
-    const lines = text.split('\n');
-
-    const lineGap = getLineGap();        // 기본 1
-    const spaceW  = getSpaceWidth();     // 기본 4
-
-    // 줄 높이
-    const H = 18;
-
-    // 예: 줄 단어 폭 계산 시
-    // const widths = lines.map(line => { let w=0; for (const ch of line) w += (ch===' ')? spaceW : (cmap[ch]?.w ?? 8); return w; });
-
-    // 예: 줄 배치 y 누적
-    // y += H; if (li < lines.length - 1) y += lineGap;
-
-    // 각 줄 폭 계산
-    const widths = lines.map(line => {
-      let w = 0;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === ' ') { w += spaceW; continue; }
-        const g = coordsMap[ch] || coordsMap[ch?.toUpperCase?.()] || coordsMap[ch?.toLowerCase?.()];
-        w += g ? g.w : 8;
-      }
-      return w;
-    });
-
-    // 블록 전체 크기
-    const blockW = Math.max(1, widths.reduce((m,v)=>Math.max(m,v), 1));
-    const blockH = Math.max(1, lines.length * H + Math.max(0, lines.length - 1) * lineGap);
-
-    // 캔버스 크기를 블록에 딱 맞추면 수직 중앙은 의미 없음.
-    // 여백이 있는 고정 캔버스를 쓰고 싶다면 setCanvasSize(원하는W, 원하는H)로 바꾸세요.
-    setCanvasSize(blockW, blockH);
-    ctx.clearRect(0, 0, blockW, blockH);
-    ctx.imageSmoothingEnabled = false;
-
-    // 세로 중앙 시작점(캔버스가 블록보다 크면 적용됨)
-    const yStart = Math.floor((canvas.height / (window.devicePixelRatio||1) - blockH) / 2);
-    for (let li = 0, y = yStart; li < lines.length; li++) {
-      const line = lines[li];
-      const lineW = widths[li];
-      // 가로 중앙 시작점
-      let x = Math.floor((blockW - lineW) / 2);
-
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === ' ') { x += spaceW; continue; }
-        const g = coordsMap[ch] || coordsMap[ch?.toUpperCase?.()] || coordsMap[ch?.toLowerCase?.()];
-        if (!g) { x += 8; continue; }
-        ctx.drawImage(spriteImg, g.sx, g.sy || 0, g.w, g.h || H, x, y, g.w, g.h || H);
-        x += g.w;
-      }
-      // 다음 줄 y
-      if (li < lines.length - 1) y += H + lineGap;
-    }
-  }
-
   // 이벤트
+  if (fontSelect) fontSelect.addEventListener('change', async () => {
+    setStatus('폰트 로딩 중...');
+    await loadResources(fontSelect.value);
+    triggerRender();
+  });
+  
   if (letterSpacingInput) letterSpacingInput.addEventListener('input', () => { if (letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value; triggerRender(); });
   if (spaceWidthInput) spaceWidthInput.addEventListener('input', () => { if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value; triggerRender(); });
   if (lineSpacingInput) lineSpacingInput.addEventListener('input', () => { if (lineSpacingVal) lineSpacingVal.textContent = lineSpacingInput.value; triggerRender(); });
@@ -346,8 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (downloadLink) downloadLink.style.display = 'none';
 
-  // 로드 후 초기 렌더
-  loadResources().then(() => {
+  // 초기 로드
+  loadResources(fontSelect.value).then(() => {
     setStatus('준비 완료');
     triggerRender();
   });
