@@ -73,15 +73,14 @@
     select {
       flex: 1;
     }
-    .theme-switcher {
-      text-align: center;
-      margin-bottom: 16px;
-    }
+    .theme-switcher{position:fixed;top:12px;right:12px;z-index:1000;}
+    .theme-switcher button{padding:6px 10px;font-size:13px;cursor:pointer;}
   </style>
 </head>
 <body>
   <div class="theme-switcher">
-    <button onclick="location.href='../'">📄 기본 테마로 변경</button>
+    <button onclick="location.href='../'">📄 기본 테마</button>
+    <button onclick="location.href='../98_theme/'" style="margin-left:6px;">🖥️ 98 테마</button>
   </div>
 
   <div class="window">
