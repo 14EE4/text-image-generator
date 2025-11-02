@@ -1,4 +1,4 @@
-import { FONTS } from './js/fonts.js';
+import { getFontsWithBasePath } from './js/fonts.js';
 import { normalizeHex } from './js/utils.js';
 import { FontLoader } from './js/loader.js';
 import { GlyphRenderer } from './js/renderer.js';
@@ -33,8 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[STATUS]', msg);
   }
 
-  // 초기화
-  const loader = new FontLoader(setStatus);
+  // 초기화 (기본 경로 사용)
+  const loader = new FontLoader(setStatus, './');
   const renderer = new GlyphRenderer(canvas, loader);
 
   // UI 초기값

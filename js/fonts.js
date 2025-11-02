@@ -14,3 +14,16 @@ export const FONTS = {
     defaultDisplayScale: 6
   }
 };
+
+// 현재 경로에 따라 상대 경로 조정
+export function getFontsWithBasePath(basePath = './') {
+  const adjustedFonts = {};
+  for (const [key, config] of Object.entries(FONTS)) {
+    adjustedFonts[key] = {
+      ...config,
+      coords: basePath + config.coords,
+      sprite: basePath + config.sprite
+    };
+  }
+  return adjustedFonts;
+}

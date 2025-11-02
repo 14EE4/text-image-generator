@@ -1,16 +1,18 @@
-import { FONTS } from './fonts.js';
+import { getFontsWithBasePath } from './fonts.js';
 
 export class FontLoader {
-  constructor(statusCallback) {
+  constructor(statusCallback, basePath = './') {
     this.meta = { cellH: 18 };
     this.coords = [];
     this.coordsMap = {};
     this.spriteImg = new Image();
     this.setStatus = statusCallback;
+    this.basePath = basePath;
+    this.FONTS = getFontsWithBasePath(basePath);
   }
 
   async loadResources(fontKey) {
-    const fontConfig = FONTS[fontKey];
+    const fontConfig = this.FONTS[fontKey];
     if (!fontConfig) {
       this.setStatus('알 수 없는 폰트', true);
       return { success: false };
