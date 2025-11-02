@@ -24,13 +24,15 @@ document.addEventListener('DOMContentLoaded', () => {
       coords: './coords.json',
       sprite: './english_old2.png',
       cellH: 18,
-      defaultSpaceWidth: 4
+      defaultSpaceWidth: 4,
+      defaultDisplayScale: 2
     },
     smallest_font: {
       coords: './sprite_fonts/smallest_font/smallest_coords.json',
       sprite: './sprite_fonts/smallest_font/smallest-font.png',
       cellH: 5,
-      defaultSpaceWidth: 2
+      defaultSpaceWidth: 2,
+      defaultDisplayScale: 6
     }
   };
 
@@ -95,6 +97,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (spaceWidthInput && spaceWidthVal) {
       spaceWidthInput.value = fontConfig.defaultSpaceWidth;
       spaceWidthVal.textContent = fontConfig.defaultSpaceWidth;
+    }
+
+    // 화면 배율 기본값 변경
+    if (displayScaleInput && displayScaleVal) {
+      displayScaleInput.value = fontConfig.defaultDisplayScale;
+      displayScaleVal.textContent = fontConfig.defaultDisplayScale;
     }
 
     try {
