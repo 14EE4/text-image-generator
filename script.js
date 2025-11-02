@@ -23,12 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
     english_old2: {
       coords: './coords.json',
       sprite: './english_old2.png',
-      cellH: 18
+      cellH: 18,
+      defaultSpaceWidth: 4
     },
     smallest_font: {
       coords: './sprite_fonts/smallest_font/smallest_coords.json',
       sprite: './sprite_fonts/smallest_font/smallest-font.png',
-      cellH: 5
+      cellH: 5,
+      defaultSpaceWidth: 2
     }
   };
 
@@ -87,6 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!fontConfig) {
       setStatus('알 수 없는 폰트', true);
       return;
+    }
+
+    // 공백 너비 기본값 변경
+    if (spaceWidthInput && spaceWidthVal) {
+      spaceWidthInput.value = fontConfig.defaultSpaceWidth;
+      spaceWidthVal.textContent = fontConfig.defaultSpaceWidth;
     }
 
     try {

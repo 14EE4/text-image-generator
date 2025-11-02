@@ -50,19 +50,3 @@
   <script src="./script.js"></script>
 </body>
 </html>
-<script>
-// 줄 배치 (예: render 함수 내부)
-const H = 18;
-const lineGap = parseInt(lineSpacingInput.value, 10) || 0;
-const lines = text.split('\n');
-
-const totalH = Math.max(1, lines.length * H + Math.max(0, lines.length - 1) * lineGap);
-setCanvasSize(maxW, totalH);
-
-let y = 0;
-for (let li = 0; li < lines.length; li++) {
-  // ...각 줄 그리기 (y 위치 고정)...
-  y += H;
-  if (li < lines.length - 1) y += lineGap; // 마지막 줄 뒤엔 추가 안함
-}
-</script>
