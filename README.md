@@ -14,6 +14,7 @@
 - ⌨️ 단축키 `Ctrl+Enter`로 생성
 - 🪟 Windows XP 테마, 🖥️ Windows 98 테마
 - 🔁 상단 고정 테마 전환 버튼(기본/XP/98 페이지 공통)
+- 🌙 다크 모드 자동 감지 + 토글 버튼(메인 페이지, LocalStorage 저장)
 
 ## 📦 지원 폰트
 
@@ -40,7 +41,7 @@ npx http-server -p 8000
 
 ```
 text-image-generator/
-├── index.html              # 기본 테마 (상단 테마 전환 버튼)
+├── index.html              # 기본 테마 (상단 테마 전환 + 다크 모드 토글)
 ├── script.js               # 기본 테마 스크립트
 ├── js/
 │   ├── fonts.js            # 폰트 설정/경로
@@ -48,10 +49,10 @@ text-image-generator/
 │   ├── loader.js           # FontLoader
 │   └── renderer.js         # GlyphRenderer
 ├── xp_theme/
-│   ├── index.html          # XP 스타일 (xp.css)
+│   ├── index.html          # XP 스타일 (xp.css, 상단 전환 버튼)
 │   └── script.js           # 상위 js/ 재사용, basePath('../')
 ├── 98_theme/
-│   └── index.html          # 98 스타일 (98.css), 상단 테마 전환 버튼
+│   └── index.html          # 98 스타일 (98.css, 상단 전환 버튼)
 ├── sprite_fonts/
 │   ├── english_old/
 │   │   ├── coords.json
@@ -68,6 +69,7 @@ text-image-generator/
 - Canvas 2D + ImageData API (색상 틴팅)
 - Fetch API
 - CSS3
+- 다크 모드: prefers-color-scheme + LocalStorage 토글
 - XP 테마: xp.css (https://unpkg.com/xp.css)
 - 98 테마: 98.css (https://unpkg.com/98.css)
 
@@ -112,7 +114,7 @@ MIT
 
 ---
 
-버전: 2.1.0  
+버전: 2.2.0  
 최종 업데이트: 2025-11-02  
 테마: 기본 + Windows XP + Windows 98  
 렌더링: Canvas 2D + ImageData API  
