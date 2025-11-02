@@ -73,16 +73,10 @@
     select {
       flex: 1;
     }
-    .theme-switcher{position:fixed;top:12px;right:12px;z-index:1000;}
-    .theme-switcher button{padding:6px 10px;font-size:13px;cursor:pointer;}
+    /* 상단 고정 테마 스위처 제거 */
   </style>
 </head>
 <body>
-  <div class="theme-switcher">
-    <button onclick="location.href='../'">📄 기본 테마</button>
-    <button onclick="location.href='../98_theme/'" style="margin-left:6px;">🖥️ 98 테마</button>
-  </div>
-
   <div class="window">
     <div class="title-bar">
       <div class="title-bar-text">텍스트 이미지 변환기</div>
@@ -94,6 +88,16 @@
     </div>
     
     <div class="window-body">
+
+      <!-- XP 스타일 테마 전환 버튼 -->
+      <fieldset style="margin-bottom: 10px;">
+        <legend>테마 전환</legend>
+        <div class="field-row" style="gap: 8px;">
+          <button onclick="location.href='../'">📄 기본 테마</button>
+          <button class="default" onclick="location.href='../98_theme/'">🖥️ 98 테마</button>
+        </div>
+      </fieldset>
+
       <div class="controls">
         <fieldset>
           <legend>설정</legend>
