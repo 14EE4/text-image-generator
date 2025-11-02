@@ -1,57 +1,29 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>텍스트 이미지 변환기</title>
-    <style>
-        body { text-align: center; font-family: sans-serif; padding: 20px; }
-        h1 { margin-bottom: 16px; }
-        input { padding: 6px; margin: 6px; width: 300px; }
-        button { padding: 8px 12px; cursor: pointer; }
-        #canvas { border: 1px solid #ccc; margin-top: 12px; background:#fff; display:block; margin-left:auto; margin-right:auto; }
-        #downloadLink { display: block; margin-top: 12px; font-size: 1.0em; }
-        .controls { margin-bottom: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>텍스트 이미지 변환기</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding:16px; }
+    .controls { margin-bottom:10px; }
+    textarea { width:420px; height:120px; resize:vertical; }
+    label { font-size:13px; margin-right:8px; }
+    #canvas { display:block; margin-top:12px; }
+  </style>
 </head>
 <body>
-    
-
-    <div class="controls">
-        <textarea id="textInput" placeholder="텍스트를 입력하세요... (여러 줄 가능)" rows="4" style="width:400px;resize:vertical;"></textarea>
-        <button id="generateBtn">생성</button>
-        <small style="display:block;color:#666;margin-top:4px;">💡 Ctrl+Enter로 생성 | Enter는 줄바꿈</small>
-
-        <div style="margin-top:8px; display:inline-block; text-align:left;">
-            <label style="font-size:13px; margin-right:8px;">
-                글자간격: <strong id="letterSpacingVal">1</strong>px
-            </label>
-            <input id="letterSpacing" type="range" min="0" max="10" value="1" style="vertical-align:middle;">
-            <br>
-            <label style="font-size:13px; margin-right:8px;">
-                공백 너비(export): <strong id="spaceWidthVal">8</strong>px
-            </label>
-            <input id="spaceWidth" type="range" min="0" max="50" value="8" style="vertical-align:middle;">
-            <br>
-            <label style="font-size:13px; margin-right:8px;">
-                줄 간격: <strong id="lineSpacingVal">2</strong>px
-            </label>
-            <input id="lineSpacing" type="range" min="0" max="40" value="2" style="vertical-align:middle;">
-            <br>
-            <label style="font-size:13px; margin-right:8px;">
-                화면 배율: <strong id="displayScaleVal">2</strong>x
-            </label>
-            <input id="displayScale" type="range" min="1" max="6" value="2" step="1" style="vertical-align:middle;">
-            <br>
-            <label style="font-size:13px; margin-right:8px;">색상:</label>
-            <input id="colorPicker" type="color" value="#000000" style="vertical-align:middle;">
-            <input id="colorHex" type="text" placeholder="#RRGGBB" value="#000000" style="width:90px;margin-left:6px;">
-        </div>
+  <div class="controls">
+    <textarea id="textInput" placeholder="여러 줄 입력 가능"></textarea>
+    <button id="generateBtn">생성</button>
+    <small style="display:block;color:#666;margin-top:4px;">Ctrl+Enter로 생성 · Enter는 줄바꿈</small>
+    <div style="margin-top:8px;">
+      <label>줄 간격: <strong id="lineSpacingVal">0</strong>px</label>
+      <input id="lineSpacing" type="range" min="0" max="40" value="0">
     </div>
+  </div>
 
-    <canvas id="canvas" width="800" height="200"></canvas>
-    <br>
-    <a id="downloadLink" style="display:none;">이미지 다운로드</a>
-
-    <script src="script.js"></script>
+  <canvas id="canvas" width="800" height="200"></canvas>
+  <a id="downloadLink" style="display:none;">이미지 다운로드</a>
+  <script src="./script.js"></script>
 </body>
 </html>
