@@ -245,7 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = (colorHex && colorHex.value) ? normalizeHex(colorHex.value) : (colorPicker ? normalizeHex(colorPicker.value || '#000000') : '#000000');
             let yOffset = 0;
 
-            for (const lineInfo of lineLayouts) {
+            for (let lineIdx = 0; lineIdx < lineLayouts.length; lineIdx++) {
+                const lineInfo = lineLayouts[lineIdx];
                 let x = 0;
                 for (let idx = 0; idx < lineInfo.layout.length; idx++) {
                     const item = lineInfo.layout[idx];
@@ -257,7 +258,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (idx < lineInfo.layout.length - 1) x += visualGapNow;
                 }
-                yOffset += lineInfo.height + lineGap;
+                yOffset += lineInfo.height;
+                // 마지막 줄이 아니면 줄 간격 추가
+                if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
             }
 
             // 다운로드 링크 업데이트
@@ -308,7 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = selHex || '#000000';
             let yOffset = 0;
 
-            for (const lineInfo of lineLayouts) {
+            for (let lineIdx = 0; lineIdx < lineLayouts.length; lineIdx++) {
+                const lineInfo = lineLayouts[lineIdx];
                 let x = 0;
                 for (let idx = 0; idx < lineInfo.layout.length; idx++) {
                     const item = lineInfo.layout[idx];
@@ -332,7 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (idx < lineInfo.layout.length - 1) x += visualGap;
                 }
-                yOffset += lineInfo.height + lineGap;
+                yOffset += lineInfo.height;
+                if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
             }
 
             // 흰색→투명 변환 (선택 색상 제외)
