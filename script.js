@@ -21,13 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const colorPicker = document.getElementById('colorPicker');
   const colorHex = document.getElementById('colorHex');
 
-  // 상태 배너
-  const status = document.createElement('div');
-  status.id = 'statusBanner';
-  status.style.cssText = 'font-family:monospace;margin:6px;padding:6px;border:1px solid #ddd;background:#f8f8f8;';
-  if (canvas?.parentNode) canvas.parentNode.insertBefore(status, canvas);
+  // 상태 배너를 HTML에서 가져오기 (동적 생성 제거)
+  const status = document.getElementById('statusBanner');
   
   function setStatus(msg, isError = false) {
+    if (!status) return;
     status.textContent = msg;
     status.style.color = isError ? '#a00' : '#080';
     console.log('[STATUS]', msg);

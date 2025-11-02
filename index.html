@@ -103,6 +103,18 @@
     .theme-switcher button { border-radius: 4px; }
     small { color: var(--muted); }
     a#downloadLink { color: var(--fg); }
+    
+    #statusBanner {
+      display: inline-block;
+      padding: 4px 8px;
+      background: var(--panel-bg);
+      border: 1px solid var(--btn-border);
+      color: var(--fg);
+      font-size: 12px;
+      font-family: monospace;
+      margin: 8px auto;
+      max-width: fit-content;
+    }
   </style>
 </head>
 <body>
@@ -145,6 +157,9 @@
   </div>
 
   <canvas id="canvas" width="800" height="200"></canvas>
+  <div style="text-align: center;">
+    <div id="statusBanner" style="display: inline-block;">준비</div>
+  </div>
   <a id="downloadLink" style="display:none;">이미지 다운로드</a>
 
   <!-- 다크모드 토글 스크립트 (OS 설정 감지 + 사용자 토글 저장) -->
