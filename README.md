@@ -2,6 +2,8 @@
 
 픽셀 폰트 스프라이트를 사용하여 텍스트를 투명 배경 PNG 이미지로 변환하는 웹 도구입니다.
 
+> 🤖 **이 프로젝트는 Claude (Anthropic AI)의 도움으로 제작되었습니다.**
+
 ## ✨ 주요 기능
 
 - 📝 **여러 줄 텍스트 지원** - 줄바꿈이 포함된 긴 텍스트 렌더링
@@ -174,7 +176,7 @@ getTransparentDataURL(threshold, color) // PNG 데이터 생성
 normalizeHex(v)           // HEX 색상 정규화
 hexToRgb(hex)             // HEX → RGB 변환
 sanitizeFilename(text)    // 파일명 안전화
-setCanvasSize(canvas, ctx, w, h) // 캔버스 크기 설정 (DPR 고려)
+setCanvasSize(canvas, ctx, w, h) // 캔버스 크기 설정
 ```
 
 ## 🐛 알려진 제한사항
@@ -209,9 +211,22 @@ python -m http.server 8000
 # Chrome DevTools > Sources > script.js 브레이크포인트 설정
 ```
 
+## 🤖 제작 정보
+
+이 프로젝트는 **Claude (Anthropic AI)** 와의 협업으로 제작되었습니다.
+
+- **AI 모델**: Claude 3.5 Sonnet
+- **개발 방식**: 페어 프로그래밍 스타일 대화형 개발
+- **주요 기여**:
+  - 모듈화된 아키텍처 설계
+  - Canvas API 기반 픽셀 렌더링 구현
+  - 색상 틴팅 알고리즘
+  - Windows XP 테마 UI
+
 ---
 
 **버전:** 2.0.0  
 **최종 업데이트:** 2025-11-02  
 **테마:** 기본 + Windows XP  
-**렌더링:** Canvas 2D + ImageData API
+**렌더링:** Canvas 2D + ImageData API  
+**AI Assisted:** Claude 3.5 Sonnet
