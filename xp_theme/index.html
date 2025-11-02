@@ -43,12 +43,18 @@
       font-family: "Fixedsys", monospace;
       box-sizing: border-box;
     }
+    .canvas-container {
+      text-align: center;
+      margin: 12px 0;
+      line-height: 0;
+    }
     #canvas {
-      display: block;
-      margin: 12px auto;
+      display: inline-block;
+      margin: 0;
       image-rendering: pixelated;
       border: 2px solid #808080;
       background: white;
+      vertical-align: top;
     }
     .button-row {
       text-align: center;
@@ -143,7 +149,7 @@
         <a id="downloadLink" style="display:none; margin-left: 8px;"></a>
       </div>
       
-      <div style="text-align: center;">
+      <div class="canvas-container">
         <canvas id="canvas" width="800" height="200"></canvas>
       </div>
       
