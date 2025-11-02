@@ -273,6 +273,58 @@ document.addEventListener('DOMContentLoaded', () => {
     renderUsingGlyphs(input ? (input.value || '') : '');
   }
 
+  function render() {
+    const text = (input.value || '').replace(/\r\n/g, '\n');
+    const lines = text.split('\n');
+
+    const H = 18; // 한 줄 높이
+    const gapRaw = parseInt((lineSpacingInput && lineSpacingInput.value) || '0', 10) || 0;
+    const lineGap = Math.max(0, gapRaw); // 음수 차단
+
+    // 각 줄 폭 계산
+    const spaceW = 8;
+    const widths = lines.map(line => {
+      let w = 0;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === ' ') { w += spaceW; continue; }
+        const g = coordsMap[ch] || coordsMap[ch?.toUpperCase?.()] || coordsMap[ch?.toLowerCase?.()];
+        w += g ? g.w : 8;
+      }
+      return w;
+    });
+
+    // 블록 전체 크기
+    const blockW = Math.max(1, widths.reduce((m,v)=>Math.max(m,v), 1));
+    const blockH = Math.max(1, lines.length * H + Math.max(0, lines.length - 1) * lineGap);
+
+    // 캔버스 크기를 블록에 딱 맞추면 수직 중앙은 의미 없음.
+    // 여백이 있는 고정 캔버스를 쓰고 싶다면 setCanvasSize(원하는W, 원하는H)로 바꾸세요.
+    setCanvasSize(blockW, blockH);
+    ctx.clearRect(0, 0, blockW, blockH);
+    ctx.imageSmoothingEnabled = false;
+
+    // 세로 중앙 시작점(캔버스가 블록보다 크면 적용됨)
+    const yStart = Math.floor((canvas.height / (window.devicePixelRatio||1) - blockH) / 2);
+    for (let li = 0, y = yStart; li < lines.length; li++) {
+      const line = lines[li];
+      const lineW = widths[li];
+      // 가로 중앙 시작점
+      let x = Math.floor((blockW - lineW) / 2);
+
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === ' ') { x += spaceW; continue; }
+        const g = coordsMap[ch] || coordsMap[ch?.toUpperCase?.()] || coordsMap[ch?.toLowerCase?.()];
+        if (!g) { x += 8; continue; }
+        ctx.drawImage(spriteImg, g.sx, g.sy || 0, g.w, g.h || H, x, y, g.w, g.h || H);
+        x += g.w;
+      }
+      // 다음 줄 y
+      if (li < lines.length - 1) y += H + lineGap;
+    }
+  }
+
   // 이벤트
   if (letterSpacingInput) letterSpacingInput.addEventListener('input', () => { if (letterSpacingVal) letterSpacingVal.textContent = letterSpacingInput.value; triggerRender(); });
   if (spaceWidthInput) spaceWidthInput.addEventListener('input', () => { if (spaceWidthVal) spaceWidthVal.textContent = spaceWidthInput.value; triggerRender(); });
