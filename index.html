@@ -10,9 +10,30 @@
     label { font-size:13px; margin-right:8px; }
     select { padding: 4px 8px; margin: 6px; font-size: 13px; }
     #canvas { display:block; margin:12px auto; image-rendering: pixelated; }
+    .theme-switcher {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+    }
+    .theme-switcher button {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .theme-switcher button:hover {
+      background: #e0e0e0;
+    }
   </style>
 </head>
 <body>
+  <div class="theme-switcher">
+    <button onclick="location.href='./xp_theme/'">🪟 XP 테마로 변경</button>
+  </div>
+
   <div class="controls">
     <div style="margin-bottom:8px;">
       <label>폰트 선택:</label>
