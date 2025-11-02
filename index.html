@@ -4,35 +4,112 @@
   <meta charset="UTF-8">
   <title>텍스트 이미지 변환기</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding:16px; text-align: center; }
+    /* 색상 변수 (기본: 라이트) */
+    :root{
+      --bg: #ffffff;
+      --fg: #111111;
+      --panel-bg: #ffffff;
+      --muted: #666666;
+      --btn-bg: #f0f0f0;
+      --btn-bg-hover: #e0e0e0;
+      --btn-border: #cccccc;
+      --canvas-bg: #ffffff;
+      --canvas-border: #999999;
+    }
+    /* OS 다크 모드 기본 반영 (사용자 지정 없을 때) */
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg: #121212;
+        --fg: #eaeaea;
+        --panel-bg: #1b1b1b;
+        --muted: #aaaaaa;
+        --btn-bg: #2a2a2a;
+        --btn-bg-hover: #333333;
+        --btn-border: #3d3d3d;
+        --canvas-bg: #111111;
+        --canvas-border: #444444;
+      }
+    }
+    /* 사용자 토글 우선 적용 */
+    body[data-theme="light"]{
+      --bg: #ffffff;
+      --fg: #111111;
+      --panel-bg: #ffffff;
+      --muted: #666666;
+      --btn-bg: #f0f0f0;
+      --btn-bg-hover: #e0e0e0;
+      --btn-border: #cccccc;
+      --canvas-bg: #ffffff;
+      --canvas-border: #999999;
+    }
+    body[data-theme="dark"]{
+      --bg: #121212;
+      --fg: #eaeaea;
+      --panel-bg: #1b1b1b;
+      --muted: #aaaaaa;
+      --btn-bg: #2a2a2a;
+      --btn-bg-hover: #333333;
+      --btn-border: #3d3d3d;
+      --canvas-bg: #111111;
+      --canvas-border: #444444;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      padding:16px;
+      text-align: center;
+      background: var(--bg);
+      color: var(--fg);
+    }
     .controls { margin-bottom:10px; }
-    textarea { width:420px; height:120px; resize:vertical; }
-    label { font-size:13px; margin-right:8px; }
-    select { padding: 4px 8px; margin: 6px; font-size: 13px; }
-    #canvas { display:block; margin:12px auto; image-rendering: pixelated; }
+    textarea {
+      width:420px; height:120px; resize:vertical;
+      background: var(--panel-bg); color: var(--fg);
+      border: 1px solid var(--btn-border);
+    }
+    label { font-size:13px; margin-right:8px; color: var(--fg); }
+    select {
+      padding: 4px 8px; margin: 6px; font-size: 13px;
+      background: var(--panel-bg); color: var(--fg);
+      border: 1px solid var(--btn-border);
+    }
+    input[type="text"], input[type="color"] {
+      background: var(--panel-bg); color: var(--fg);
+      border: 1px solid var(--btn-border);
+    }
+    button {
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--fg);
+    }
+    button:hover { background: var(--btn-bg-hover); }
+    #canvas {
+      display:block; margin:12px auto; image-rendering: pixelated;
+      background: var(--canvas-bg);
+      border: 1px solid var(--canvas-border);
+    }
     .theme-switcher {
       position: fixed;
       top: 16px;
       right: 16px;
       z-index: 1000;
+      display: flex;
+      gap: 6px;
     }
-    .theme-switcher button {
-      background: #f0f0f0;
-      border: 1px solid #ccc;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .theme-switcher button:hover {
-      background: #e0e0e0;
-    }
+    .theme-switcher button { border-radius: 4px; }
+    small { color: var(--muted); }
+    a#downloadLink { color: var(--fg); }
   </style>
 </head>
 <body>
   <div class="theme-switcher">
     <button onclick="location.href='./xp_theme/'">🪟 XP 테마로</button>
-    <button onclick="location.href='./98_theme/'" style="margin-left:6px;">🖥️ 98 테마로</button>
+    <button onclick="location.href='./98_theme/'">🖥️ 98 테마로</button>
+    <button id="toggleThemeBtn" title="라이트/다크 전환"></button>
   </div>
 
   <div class="controls">
@@ -46,7 +123,7 @@
     
     <textarea id="textInput" placeholder="여러 줄 입력 가능"></textarea>
     <button id="generateBtn">생성</button>
-    <small style="display:block;color:#666;margin-top:4px;">Ctrl+Enter로 생성 · Enter는 줄바꿈</small>
+    <small style="display:block;margin-top:4px;">Ctrl+Enter로 생성 · Enter는 줄바꿈</small>
     
     <div style="margin-top:8px; display:inline-block; text-align:left;">
       <label>글자간격: <strong id="letterSpacingVal">1</strong>px</label>
@@ -69,6 +146,43 @@
 
   <canvas id="canvas" width="800" height="200"></canvas>
   <a id="downloadLink" style="display:none;">이미지 다운로드</a>
+
+  <!-- 다크모드 토글 스크립트 (OS 설정 감지 + 사용자 토글 저장) -->
+  <script>
+    (function(){
+      const btn = document.getElementById('toggleThemeBtn');
+      const media = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      const saved = localStorage.getItem('theme');
+      const prefersDark = media && media.matches;
+
+      function setBtnLabel(theme){
+        if (!btn) return;
+        btn.textContent = theme === 'dark' ? '☀️ 라이트 모드' : '🌙 다크 모드';
+        btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+      }
+      function applyTheme(theme, persist){
+        document.body.dataset.theme = theme;
+        setBtnLabel(theme);
+        if (persist) localStorage.setItem('theme', theme);
+      }
+
+      const initial = saved || (prefersDark ? 'dark' : 'light');
+      applyTheme(initial, false);
+
+      if (media && media.addEventListener && !saved){
+        media.addEventListener('change', e => {
+          if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light', false);
+        });
+      }
+
+      btn && btn.addEventListener('click', () => {
+        const current = document.body.dataset.theme === 'dark' ? 'dark' : 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next, true);
+      });
+    })();
+  </script>
+
   <script type="module" src="./script.js"></script>
 </body>
 </html>
