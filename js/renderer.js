@@ -188,17 +188,24 @@ export class GlyphRenderer {
     const dAll = imgAll.data;
 
     for (let i = 0; i < dAll.length; i += 4) {
-      const r = dAll[i], g = dAll[i + 1], b = dAll[i + 2], a = dAll[i + 3];
-      if (a > 0 && r >= threshold && g >= threshold && b >= threshold) {
-        if (!closeToSelected(r, g, b)) dAll[i + 3] = 0;
+      // 1. Check alpha first. If it's effectively transparent, nuke it to 0,0,0,0
+      if (dAll[i + 3] < 10) { // Threshold for "transparent enough"
+        dAll[i] = 0;
+        dAll[i + 1] = 0;
+        dAll[i + 2] = 0;
+        dAll[i + 3] = 0;
+        continue;
       }
 
-      // Force exact color match for visible pixels
-      if (dAll[i + 3] > 0) {
-        dAll[i] = selRgb.r;
-        dAll[i + 1] = selRgb.g;
-        dAll[i + 2] = selRgb.b;
-      }
+      // 2. If it's visible, FORCE the RGB to be exactly the selected color.
+      // We ignore the original RGB values completely for visible pixels, 
+      // as they should be the text color.
+      dAll[i] = selRgb.r;
+      dAll[i + 1] = selRgb.g;
+      dAll[i + 2] = selRgb.b;
+      // We preserve the alpha (dAll[i+3]) to keep anti-aliasing if it exists,
+      // or we could force it to 255 if binary is desired. 
+      // Assuming user wants to keep the shape (alpha), just fix the color.
     }
 
     tctx.putImageData(imgAll, 0, 0);
