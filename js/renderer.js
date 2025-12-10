@@ -204,9 +204,10 @@ export class GlyphRenderer {
       // 2. If it's visible, FORCE the RGB to be exactly the selected color.
       // AND FORCE ALPHA TO 255 (Fully Opaque) to prevent browser premultiplication artifacts.
       // This sacrifices anti-aliasing for color precision, which is preferred for pixel art.
-      dAll[i] = selRgb.r;
-      dAll[i + 1] = selRgb.g;
-      dAll[i + 2] = selRgb.b;
+      // Force pure black and full opacity for all visible pixels
+      dAll[i] = 0;
+      dAll[i + 1] = 0;
+      dAll[i + 2] = 0;
       dAll[i + 3] = 255;
     }
 
