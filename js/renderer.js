@@ -198,14 +198,12 @@ export class GlyphRenderer {
       }
 
       // 2. If it's visible, FORCE the RGB to be exactly the selected color.
-      // We ignore the original RGB values completely for visible pixels, 
-      // as they should be the text color.
+      // AND FORCE ALPHA TO 255 (Fully Opaque) to prevent browser premultiplication artifacts.
+      // This sacrifices anti-aliasing for color precision, which is preferred for pixel art.
       dAll[i] = selRgb.r;
       dAll[i + 1] = selRgb.g;
       dAll[i + 2] = selRgb.b;
-      // We preserve the alpha (dAll[i+3]) to keep anti-aliasing if it exists,
-      // or we could force it to 255 if binary is desired. 
-      // Assuming user wants to keep the shape (alpha), just fix the color.
+      dAll[i + 3] = 255;
     }
 
     tctx.putImageData(imgAll, 0, 0);
