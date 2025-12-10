@@ -26,9 +26,10 @@ export class GlyphRenderer {
 
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] === 0) continue;
-      d[i] = rgb.r;
-      d[i + 1] = rgb.g;
-      d[i + 2] = rgb.b;
+      d[i] = 0;
+      d[i + 1] = 0;
+      d[i + 2] = 0;
+      d[i + 3] = 255; // full opacity
     }
 
     this.tintOffCtx.putImageData(img, 0, 0);
@@ -85,6 +86,11 @@ export class GlyphRenderer {
     setCanvasSize(this.canvas, this.ctx, canvasW, canvasH);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
+    // Fill background with black to eliminate any gray/colored edges from semi‑transparent glyphs
+    this.ctx.fillStyle = '#000000';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // Use copy mode to avoid any blending that could introduce off‑black values
+    this.ctx.globalCompositeOperation = 'copy';
 
     // CSS는 displayScale 적용 (정수 배율만 사용하여 픽셀 퍼펙트 유지)
     const displayW = canvasW * displayScale;
@@ -102,6 +108,8 @@ export class GlyphRenderer {
         if (item.type === 'glyph') {
           this.drawTintedGlyph(item.g, this.ctx, x, yOffset, color, fixedH);
           x += item.srcW || 0;
+          // Reset composite mode after each glyph if needed (optional)
+          this.ctx.globalCompositeOperation = 'copy';
         } else {
           x += item.srcW || 0;
         }
