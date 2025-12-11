@@ -3,12 +3,12 @@ import { hexToRgb, setCanvasSize, sanitizeFilename } from './utils.js';
 export class GlyphRenderer {
   constructor(canvas, loader) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+    this.ctx = canvas.getContext('2d', { willReadFrequently: false, colorSpace: 'srgb' });
     this.loader = loader;
     this.lastRenderLayout = null;
 
     this.tintOff = document.createElement('canvas');
-    this.tintOffCtx = this.tintOff.getContext('2d');
+    this.tintOffCtx = this.tintOff.getContext('2d', { willReadFrequently: false });
   }
 
   drawTintedGlyph(g, destCtx, dx, dy, colorHex, fixedH) {
@@ -143,6 +143,18 @@ export class GlyphRenderer {
       }
     }
     this.ctx.putImageData(finalImg, 0, 0);
+
+    // Verify immediately
+    const checkImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    const checkD = checkImg.data;
+    let failCount = 0;
+    for (let i = 0; i < checkD.length; i += 4) {
+      const a = checkD[i + 3];
+      const r = checkD[i];
+      if (a === 0 && (r !== 0 || checkD[i + 1] !== 0 || checkD[i + 2] !== 0)) failCount++;
+      else if (a > 0 && (r !== 0 || checkD[i + 1] !== 0 || checkD[i + 2] !== 0 || a !== 255)) failCount++;
+    }
+    console.log(`[Renderer] Instant Self-Check: ${failCount} bad pixels found after cleanup.`);
 
     return { success: true, filename: sanitizeFilename(text) + '.png' };
   }
