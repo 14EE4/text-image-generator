@@ -32,7 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 초기화 (기본 경로 사용)
-  const loader = new FontLoader(setStatus, './');
+  // Dynamically determine the base path of this script so that resources are loaded correctly when the script is used from sub‑directories (e.g., 98_theme).
+  const scriptUrl = new URL(import.meta.url);
+  // Remove the script filename to get the directory URL, ensure it ends with a slash.
+  const basePath = scriptUrl.pathname.replace(/[^/]*$/, '');
+  const loader = new FontLoader(setStatus, basePath);
   const renderer = new GlyphRenderer(canvas, loader);
 
   // UI 초기값
