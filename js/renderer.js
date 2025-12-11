@@ -168,7 +168,8 @@ export class GlyphRenderer {
     // "Vector Reconstruction"
     // We reconstruct the image using purely standard drawing commands (fillRect).
     verifyCtx.clearRect(0, 0, verifyCanvas.width, verifyCanvas.height);
-    verifyCtx.fillStyle = '#000000';
+    // Apply user selected color for display
+    verifyCtx.fillStyle = color || '#000000';
 
     // Iterate and draw only black pixels
     for (let i = 0; i < cleanData.length; i += 4) {
