@@ -38,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const basePath = scriptUrl.pathname.replace(/[^/]*$/, '');
   const loader = new FontLoader(setStatus, basePath);
   const renderer = new GlyphRenderer(canvas, loader);
+  // 👉 디버깅용: 전역에 노출해서 콘솔에서 바로 확인할 수 있게 함
+  if (typeof window !== 'undefined') {
+    window.renderer = renderer;
+    window.canvas = canvas;
+  }
 
   // UI 초기값
   if (displayScaleInput && displayScaleVal) displayScaleVal.textContent = displayScaleInput.value;
