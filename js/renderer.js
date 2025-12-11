@@ -3,12 +3,13 @@ import { hexToRgb, setCanvasSize, sanitizeFilename } from './utils.js';
 export class GlyphRenderer {
   constructor(canvas, loader) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { willReadFrequently: false, colorSpace: 'srgb' });
+    // Force CPU rendering (software) to avoid GPU color dithering/approximation
+    this.ctx = canvas.getContext('2d', { willReadFrequently: true });
     this.loader = loader;
     this.lastRenderLayout = null;
 
     this.tintOff = document.createElement('canvas');
-    this.tintOffCtx = this.tintOff.getContext('2d', { willReadFrequently: false });
+    this.tintOffCtx = this.tintOff.getContext('2d', { willReadFrequently: true });
   }
 
   drawTintedGlyph(g, destCtx, dx, dy, colorHex, fixedH) {
@@ -184,7 +185,8 @@ export class GlyphRenderer {
     const tmp = document.createElement('canvas');
     tmp.width = maxW;
     tmp.height = totalH;
-    const tctx = tmp.getContext('2d');
+    // Force CPU rendering here too
+    const tctx = tmp.getContext('2d', { willReadFrequently: true });
     tctx.imageSmoothingEnabled = false;
 
     let yOffset = 0;
