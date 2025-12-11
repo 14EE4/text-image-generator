@@ -81,6 +81,14 @@ text-image-generator/
 
 흐름: 스프라이트 로드 → 레이아웃 계산 → 색상 틴팅 → 캔버스 합성 → PNG 출력
 
+## 🛡️ 픽셀 무결성 보장 (Pixel Purity)
+
+**Brave** 등 핑거프린팅 방지 기능이 켜진 브라우저에서도 사용자가 의도한 정확한 색상(투명도 포함)을 얻을 수 있도록 별도의 **커스텀 PNG 인코더(`js/png_encoder.js`)**를 내장했습니다.
+
+- **Direct Encoding**: 브라우저의 `toDataURL`을 사용하지 않고, 검증된 메모리 버퍼에서 직접 PNG 파일을 생성합니다.
+- **Privacy Bypass**: 브라우저가 다운로드되는 이미지에 노이즈를 섞는 행위를 원천 차단합니다.
+- **GPU Safe**: 그래픽 드라이버의 연산 오차 없이 완벽한 `(0,0,0,0)` 또는 선택된 색상을 보장합니다.
+
 ## 📝 coords.json 형식
 
 ```json
@@ -103,7 +111,6 @@ text-image-generator/
 - 지원 문자는 폰트 파일에 의존
 - 유니코드/이모지 미지원
 - 매우 긴 텍스트 성능 저하 가능
-- **TODO:** 검은색이 0,0,1 이런식으로 나옴
 
 ## 🤝 기여
 
@@ -115,8 +122,8 @@ MIT
 
 ---
 
-버전: 2.2.0  
-최종 업데이트: 2025-11-02  
+버전: 2.2.1  
+최종 업데이트: 2025-12-11  
 테마: 기본 + Windows XP + Windows 98  
-렌더링: Canvas 2D + ImageData API  
+렌더링: Canvas 2D + Custom PNG Encoder (Client-side)  
 AI Assisted: GitHub Copilot (GPT-5, Claude 3.5 Sonnet)

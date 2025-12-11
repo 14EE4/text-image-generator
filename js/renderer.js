@@ -153,7 +153,7 @@ export class GlyphRenderer {
     this.cleanData = cleanData;
 
     // 3. Render to Detached Canvas (Verification Layer)
-    // We use a detached canvas to ensure no browser/DOM interference (extensions, etc.) affects the data.
+    // We use a detached canvas to ensure no browser/DOM interference.
     const verifyCanvas = document.createElement('canvas');
     verifyCanvas.width = this.canvas.width;
     verifyCanvas.height = this.canvas.height;
@@ -165,31 +165,8 @@ export class GlyphRenderer {
     });
     verifyCtx.imageSmoothingEnabled = false;
 
-    // SANITY CHECK: Does clearRect work?
-    verifyCtx.clearRect(0, 0, verifyCanvas.width, verifyCanvas.height);
-    const sanityImg = verifyCtx.getImageData(0, 0, 10, 10); // Check top-left 10x10
-    const sanityD = sanityImg.data;
-    for (let i = 0; i < sanityD.length; i += 4) {
-      if (sanityD[i] || sanityD[i + 1] || sanityD[i + 2] || sanityD[i + 3]) {
-        console.error(`[Renderer] FATAL: Browser cannot even clear canvas! Found garbage at ${i / 4}:`, [sanityD[i], sanityD[i + 1], sanityD[i + 2], sanityD[i + 3]]);
-        break;
-      }
-    }
-
-    // PRE-CHECK: Verify cleanData array in memory
-    let preCheckFail = false;
-    for (let i = 0; i < cleanData.length; i += 4) {
-      if (cleanData[i + 3] === 0 && (cleanData[i] !== 0 || cleanData[i + 1] !== 0 || cleanData[i + 2] !== 0)) {
-        console.error(`[Renderer] Logic Error! cleanData dirty at index ${i / 4}`);
-        preCheckFail = true;
-        break;
-      }
-    }
-    if (!preCheckFail) console.log(`[Renderer] cleanData (in-memory buffer) is 100% CLEAN.`);
-
-    // ALTERNATIVE RENDER: "Vector Reconstruction"
-    // Since putImageData is causing artifacts on this browser, we reconstruct the image
-    // using purely standard drawing commands (fillRect), which use a different pipeline.
+    // "Vector Reconstruction"
+    // We reconstruct the image using purely standard drawing commands (fillRect).
     verifyCtx.clearRect(0, 0, verifyCanvas.width, verifyCanvas.height);
     verifyCtx.fillStyle = '#000000';
 
@@ -203,65 +180,9 @@ export class GlyphRenderer {
       }
     }
 
-    // 4. Verify Internal Data Integrity
-    let internalImg = verifyCtx.getImageData(0, 0, verifyCanvas.width, verifyCanvas.height);
-    let internalD = internalImg.data;
-    const verifyingWidth = verifyCanvas.width;
-    const verifyingHeight = verifyCanvas.height;
-    let internalFailCount = 0;
-    let internalFirstFail = null;
-    let internalFirstFailXY = null;
-    // const badPixels = []; // Store coordinates of bad pixels // No longer needed for brute force fix
-
-    for (let i = 0; i < internalD.length; i += 4) {
-      const r = internalD[i];
-      const g = internalD[i + 1];
-      const b = internalD[i + 2];
-      const a = internalD[i + 3];
-
-      const isTransparentFail = (a === 0 && (r !== 0 || g !== 0 || b !== 0));
-      const isVisibleFail = (a > 0 && (a !== 255 || r !== 0 || g !== 0 || b !== 0));
-
-      if (isTransparentFail || isVisibleFail) {
-        internalFailCount++;
-        if (!internalFirstFail) {
-          internalFirstFail = [r, g, b, a];
-          const pxIdx = i / 4;
-          internalFirstFailXY = { x: pxIdx % verifyingWidth, y: Math.floor(pxIdx / verifyingWidth) };
-        }
-      }
-    }
-
-    if (internalFailCount > 0) {
-      console.error(`[Renderer] CRITICAL: Internal Data Generation Failed after FIX! ${internalFailCount} bad pixels. At (${internalFirstFailXY?.x}, ${internalFirstFailXY?.y}):`, internalFirstFail);
-    } else {
-      console.log(`[Renderer] Internal pixel data verified: 100% Clean.`);
-    }
-
-    // 5. Transfer to Visible Canvas
+    // 4. Transfer to Visible Canvas
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.drawImage(verifyCanvas, 0, 0);
-
-    // 6. Optional: Check Visible Canvas (Debug only)
-    // If internal is clean but visible is dirty, it's a browser/extension issue.
-    const visibleImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-    const visibleD = visibleImg.data;
-    let visibleFailCount = 0;
-    // We only count roughly to see if there's a difference
-    for (let i = 0; i < visibleD.length; i += 4) {
-      const a = visibleD[i + 3];
-      const r = visibleD[i];
-      const g = visibleD[i + 1];
-      const b = visibleD[i + 2];
-      const isFail = (a === 0 && (r || g || b)) || (a > 0 && (a !== 255 || r || g || b));
-      if (isFail) visibleFailCount++;
-    }
-
-    if (visibleFailCount > 0 && internalFailCount === 0) {
-      console.warn(`[Renderer] Visible canvas has ${visibleFailCount} artifacts, but internal data is CLEAN. Download will be correct.`);
-    } else if (visibleFailCount === 0) {
-      console.log(`[Renderer] Visible canvas matches internal data (Clean).`);
-    }
 
     return { success: true, filename: sanitizeFilename(text) + '.png' };
   }
