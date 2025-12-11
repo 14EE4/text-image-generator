@@ -25,11 +25,18 @@ export class GlyphRenderer {
     const rgb = hexToRgb(colorHex);
 
     for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] === 0) continue;
+      if (d[i + 3] === 0) {
+        // Fully transparent pixel – clear RGB as well.
+        d[i] = 0;
+        d[i + 1] = 0;
+        d[i + 2] = 0;
+        continue;
+      }
+      // Visible pixel – force pure black and full opacity.
       d[i] = 0;
       d[i + 1] = 0;
       d[i + 2] = 0;
-      d[i + 3] = 255; // full opacity
+      d[i + 3] = 255;
     }
 
     this.tintOffCtx.putImageData(img, 0, 0);
@@ -192,20 +199,21 @@ export class GlyphRenderer {
     const dAll = imgAll.data;
 
     for (let i = 0; i < dAll.length; i += 4) {
-      // 1. Check alpha first. If it's fully transparent, clear it completely.
-      if (dAll[i + 3] === 0) {
+      // 1. If pixel is effectively transparent (alpha <= 10), clear it completely.
+      if (dAll[i + 3] <= 10) {
         dAll[i] = 0;
         dAll[i + 1] = 0;
         dAll[i + 2] = 0;
         dAll[i + 3] = 0;
         continue;
       }
-
-      // 2. For any visible pixel, force pure black with full opacity.
+      // 2. For any visible pixel, force pure black and full opacity.
       dAll[i] = 0;
       dAll[i + 1] = 0;
       dAll[i + 2] = 0;
       dAll[i + 3] = 255;
+
+
     }
 
     tctx.putImageData(imgAll, 0, 0);
