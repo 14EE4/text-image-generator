@@ -179,6 +179,8 @@ export class GlyphRenderer {
     const verifyingWidth = verifyCanvas.width;
     const verifyingHeight = verifyCanvas.height;
     let internalFailCount = 0;
+    let internalFirstFail = null;
+    let internalFirstFailXY = null;
     const badPixels = []; // Store coordinates of bad pixels
 
     for (let i = 0; i < internalD.length; i += 4) {
@@ -220,8 +222,8 @@ export class GlyphRenderer {
       internalImg = verifyCtx.getImageData(0, 0, verifyingWidth, verifyingHeight);
       internalD = internalImg.data;
       internalFailCount = 0;
-      let internalFirstFail = null;
-      let internalFirstFailXY = null;
+      internalFirstFail = null;
+      internalFirstFailXY = null;
 
       for (let i = 0; i < internalD.length; i += 4) {
         const r = internalD[i];
