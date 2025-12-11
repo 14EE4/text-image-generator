@@ -199,24 +199,21 @@ export class GlyphRenderer {
     const dAll = imgAll.data;
 
     for (let i = 0; i < dAll.length; i += 4) {
-      // 1. If pixel is effectively transparent (alpha <= 10), clear it completely.
-      if (dAll[i + 3] <= 10) {
+      if (dAll[i + 3] === 255) {
+        // Fully opaque pixel – force pure black
+        dAll[i] = 0;
+        dAll[i + 1] = 0;
+        dAll[i + 2] = 0;
+        // alpha stays 255
+      } else {
+        // Any non‑opaque pixel – make fully transparent and clear color
         dAll[i] = 0;
         dAll[i + 1] = 0;
         dAll[i + 2] = 0;
         dAll[i + 3] = 0;
-        continue;
       }
-      // 2. For any visible pixel, force pure black and full opacity.
-      dAll[i] = 0;
-      dAll[i + 1] = 0;
-      dAll[i + 2] = 0;
-      dAll[i + 3] = 255;
-
-
-    }
-
-    tctx.putImageData(imgAll, 0, 0);
+    } tctx.putImageData(imgAll, 0, 0);
     return tmp.toDataURL('image/png');
   }
 }
+```
