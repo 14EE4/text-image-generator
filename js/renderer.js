@@ -153,7 +153,8 @@ export class GlyphRenderer {
     const verifyCanvas = document.createElement('canvas');
     verifyCanvas.width = this.canvas.width;
     verifyCanvas.height = this.canvas.height;
-    const verifyCtx = verifyCanvas.getContext('2d');
+    // Driver bug prevention: Force CPU rendering
+    const verifyCtx = verifyCanvas.getContext('2d', { willReadFrequently: true });
 
     // PRE-CHECK: Verify cleanData array in memory
     let preCheckFail = false;
