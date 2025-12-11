@@ -174,12 +174,12 @@ export class GlyphRenderer {
     verifyCtx.putImageData(newImageData, 0, 0);
 
     // 4. Verify Internal Data Integrity
-    const internalImg = verifyCtx.getImageData(0, 0, verifyCanvas.width, verifyCanvas.height);
-    const internalD = internalImg.data;
+    let internalImg = verifyCtx.getImageData(0, 0, verifyCanvas.width, verifyCanvas.height);
+    let internalD = internalImg.data;
+    const verifyingWidth = verifyCanvas.width;
+    const verifyingHeight = verifyCanvas.height;
     let internalFailCount = 0;
-    let internalFirstFail = null;
-    let internalFirstFailXY = null;
-    const width = verifyCanvas.width;
+    const badPixels = []; // Store coordinates of bad pixels
 
     for (let i = 0; i < internalD.length; i += 4) {
       const r = internalD[i];
@@ -192,16 +192,59 @@ export class GlyphRenderer {
 
       if (isTransparentFail || isVisibleFail) {
         internalFailCount++;
-        if (!internalFirstFail) {
-          internalFirstFail = [r, g, b, a];
-          const pxIdx = i / 4;
-          internalFirstFailXY = { x: pxIdx % width, y: Math.floor(pxIdx / width) };
+        badPixels.push({ x: (i / 4) % verifyingWidth, y: Math.floor((i / 4) / verifyingWidth) });
+      }
+    }
+
+    // 4.1 Brute Force Fix for Browser Bugs
+    // If putImageData left artifacts (e.g. 0,1,0,0), force-clear them with clearRect
+    if (internalFailCount > 0) {
+      console.warn(`[Renderer] Found ${internalFailCount} artifacts after putImageData. Attempting force-clear fix...`);
+      for (const p of badPixels) {
+        // We only clear if it was supposed to be transparent.
+        // If it was supposed to be black but is wrong (e.g. 0,0,0,254), clearRect would make it transparent (wrong).
+        // Check our cleanData source of truth
+        const srcIdx = (p.y * verifyingWidth + p.x) * 4;
+        if (cleanData[srcIdx + 3] === 0) {
+          verifyCtx.clearRect(p.x, p.y, 1, 1);
+        } else {
+          // If it was supposed to be visible, we can try fillRect?
+          // For now, let's just clearRect if generic transparency failed.
+          // Actually, let's re-paint black if it was supposed to be black.
+          verifyCtx.fillStyle = '#000000';
+          verifyCtx.fillRect(p.x, p.y, 1, 1);
+        }
+      }
+
+      // 4.2 Re-verify
+      internalImg = verifyCtx.getImageData(0, 0, verifyingWidth, verifyingHeight);
+      internalD = internalImg.data;
+      internalFailCount = 0;
+      let internalFirstFail = null;
+      let internalFirstFailXY = null;
+
+      for (let i = 0; i < internalD.length; i += 4) {
+        const r = internalD[i];
+        const g = internalD[i + 1];
+        const b = internalD[i + 2];
+        const a = internalD[i + 3];
+
+        const isTransparentFail = (a === 0 && (r !== 0 || g !== 0 || b !== 0));
+        const isVisibleFail = (a > 0 && (a !== 255 || r !== 0 || g !== 0 || b !== 0));
+
+        if (isTransparentFail || isVisibleFail) {
+          internalFailCount++;
+          if (!internalFirstFail) {
+            internalFirstFail = [r, g, b, a];
+            const pxIdx = i / 4;
+            internalFirstFailXY = { x: pxIdx % verifyingWidth, y: Math.floor(pxIdx / verifyingWidth) };
+          }
         }
       }
     }
 
     if (internalFailCount > 0) {
-      console.error(`[Renderer] CRITICAL: Internal Data Generation Failed! ${internalFailCount} bad pixels. At (${internalFirstFailXY?.x}, ${internalFirstFailXY?.y}):`, internalFirstFail);
+      console.error(`[Renderer] CRITICAL: Internal Data Generation Failed after FIX! ${internalFailCount} bad pixels. At (${internalFirstFailXY?.x}, ${internalFirstFailXY?.y}):`, internalFirstFail);
     } else {
       console.log(`[Renderer] Internal pixel data verified: 100% Clean.`);
     }
