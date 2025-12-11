@@ -146,19 +146,10 @@ export class GlyphRenderer {
       }
     }
 
-    // 2. Put into a fresh offscreen canvas (Software mode)
-    const cleanCanvas = document.createElement('canvas');
-    cleanCanvas.width = this.canvas.width;
-    cleanCanvas.height = this.canvas.height;
-    const cleanCtx = cleanCanvas.getContext('2d', { willReadFrequently: true });
-    cleanCtx.putImageData(finalImg, 0, 0);
-
-    // 3. Brutal Force Copy to Main Canvas
-    // 'copy' operation REPLACES pixels, ignoring blending
-    const oldGCO = this.ctx.globalCompositeOperation;
-    this.ctx.globalCompositeOperation = 'copy';
-    this.ctx.drawImage(cleanCanvas, 0, 0);
-    this.ctx.globalCompositeOperation = oldGCO;
+    // 2. Direct Write to Main Canvas
+    // Using putImageData ensures exact pixel values are preserved, 
+    // preventing any unexpected compositing or dithering artifacts.
+    this.ctx.putImageData(finalImg, 0, 0);
 
     // Verify immediately (Main Canvas)
     const checkImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
