@@ -199,22 +199,21 @@ export class GlyphRenderer {
     }
 
     // 4.1 Brute Force Fix for Browser Bugs
-    // If putImageData left artifacts (e.g. 0,1,0,0), force-clear them with clearRect
+    // If putImageData left artifacts (e.g. 0,1,0,0), force-clear them with explicit putImageData
+    // clearRect might fail if the browser has compositing quirks, but putImageData should be exact.
     if (internalFailCount > 0) {
-      console.warn(`[Renderer] Found ${internalFailCount} artifacts after putImageData. Attempting force-clear fix...`);
+      console.warn(`[Renderer] Found ${internalFailCount} artifacts after putImageData. Attempting spot-repair with putImageData...`);
+
+      const onePixelTransparent = new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
+      const onePixelBlack = new ImageData(new Uint8ClampedArray([0, 0, 0, 255]), 1, 1);
+
       for (const p of badPixels) {
-        // We only clear if it was supposed to be transparent.
-        // If it was supposed to be black but is wrong (e.g. 0,0,0,254), clearRect would make it transparent (wrong).
         // Check our cleanData source of truth
         const srcIdx = (p.y * verifyingWidth + p.x) * 4;
         if (cleanData[srcIdx + 3] === 0) {
-          verifyCtx.clearRect(p.x, p.y, 1, 1);
+          verifyCtx.putImageData(onePixelTransparent, p.x, p.y);
         } else {
-          // If it was supposed to be visible, we can try fillRect?
-          // For now, let's just clearRect if generic transparency failed.
-          // Actually, let's re-paint black if it was supposed to be black.
-          verifyCtx.fillStyle = '#000000';
-          verifyCtx.fillRect(p.x, p.y, 1, 1);
+          verifyCtx.putImageData(onePixelBlack, p.x, p.y);
         }
       }
 
