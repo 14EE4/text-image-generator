@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 상태 배너를 HTML에서 가져오기 (동적 생성 제거)
   const status = document.getElementById('statusBanner');
-  
+
   function setStatus(msg, isError = false) {
     if (!status) return;
     status.textContent = msg;
@@ -71,9 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const result = renderer.render(text, options);
-    
+
     if (result.success) {
-      downloadLink.href = renderer.getTransparentDataURL(250, options.color);
+      downloadLink.href = renderer.getTransparentDataURL(250, '#000000');
       downloadLink.download = result.filename;
       downloadLink.style.display = 'inline';
       downloadLink.textContent = '이미지 다운로드';
@@ -117,12 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   colorHex?.addEventListener('input', () => {
     colorHex.value = normalizeHex(colorHex.value);
-    try { if (colorPicker) colorPicker.value = colorHex.value; } catch(e) {}
+    try { if (colorPicker) colorPicker.value = colorHex.value; } catch (e) { }
     triggerRender();
   });
 
   btn?.addEventListener('click', triggerRender);
-  
+
   input?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault();
