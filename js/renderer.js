@@ -153,8 +153,24 @@ export class GlyphRenderer {
     const verifyCanvas = document.createElement('canvas');
     verifyCanvas.width = this.canvas.width;
     verifyCanvas.height = this.canvas.height;
-    // Driver bug prevention: Force CPU rendering
-    const verifyCtx = verifyCanvas.getContext('2d', { willReadFrequently: true });
+    // Driver bug prevention: Force CPU rendering + explicit SRGB
+    const verifyCtx = verifyCanvas.getContext('2d', {
+      willReadFrequently: true,
+      colorSpace: 'srgb',
+      alpha: true
+    });
+    verifyCtx.imageSmoothingEnabled = false;
+
+    // SANITY CHECK: Does clearRect work?
+    verifyCtx.clearRect(0, 0, verifyCanvas.width, verifyCanvas.height);
+    const sanityImg = verifyCtx.getImageData(0, 0, 10, 10); // Check top-left 10x10
+    const sanityD = sanityImg.data;
+    for (let i = 0; i < sanityD.length; i += 4) {
+      if (sanityD[i] || sanityD[i + 1] || sanityD[i + 2] || sanityD[i + 3]) {
+        console.error(`[Renderer] FATAL: Browser cannot even clear canvas! Found garbage at ${i / 4}:`, [sanityD[i], sanityD[i + 1], sanityD[i + 2], sanityD[i + 3]]);
+        break;
+      }
+    }
 
     // PRE-CHECK: Verify cleanData array in memory
     let preCheckFail = false;
