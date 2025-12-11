@@ -1,4 +1,5 @@
 import { hexToRgb, setCanvasSize, sanitizeFilename } from './utils.js';
+import { encodePNG } from './png_encoder.js';
 
 export class GlyphRenderer {
   constructor(canvas, loader) {
@@ -148,6 +149,9 @@ export class GlyphRenderer {
       }
     }
 
+    // CACHE CLEAN DATA
+    this.cleanData = cleanData;
+
     // 3. Render to Detached Canvas (Verification Layer)
     // We use a detached canvas to ensure no browser/DOM interference (extensions, etc.) affects the data.
     const verifyCanvas = document.createElement('canvas');
@@ -263,98 +267,46 @@ export class GlyphRenderer {
   }
 
   getTransparentDataURL(threshold = 250, selectedColor = '#000000') {
-    const selRgb = hexToRgb(selectedColor);
-    const colorTolerance = 8;
-    const closeToSelected = (r, g, b) =>
-      Math.abs(r - selRgb.r) <= colorTolerance &&
-      Math.abs(g - selRgb.g) <= colorTolerance &&
-      Math.abs(b - selRgb.b) <= colorTolerance;
-
-    if (!this.lastRenderLayout?.lineLayouts?.length) {
-      return this.canvas.toDataURL('image/png');
+    if (!this.cleanData || !this.lastRenderLayout) {
+      console.warn('[Renderer] No clean data available for download.');
+      return '';
     }
 
-    const { lineLayouts, visualGap, lineGap } = this.lastRenderLayout;
-    let maxW = 0, totalH = 0;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
 
-    for (const l of lineLayouts) {
-      maxW = Math.max(maxW, l.width);
-      totalH += l.height;
-    }
-    if (lineLayouts.length > 1) totalH += (lineLayouts.length - 1) * lineGap;
-    if (maxW <= 0 || totalH <= 0) return this.canvas.toDataURL('image/png');
+    // Check if we need to apply color
+    // cleanData is guaranteed to be Pure Black (0,0,0,255) or Transparent (0,0,0,0)
+    let finalData = this.cleanData;
+    const normColor = selectedColor.toLowerCase();
 
-    const tmp = document.createElement('canvas');
-    tmp.width = maxW;
-    tmp.height = totalH;
-    // Force CPU rendering here too
-    const tctx = tmp.getContext('2d', { willReadFrequently: true });
-    tctx.imageSmoothingEnabled = false;
-
-    let yOffset = 0;
-    for (let lineIdx = 0; lineIdx < lineLayouts.length; lineIdx++) {
-      const lineInfo = lineLayouts[lineIdx];
-      let x = 0;
-
-      for (let idx = 0; idx < lineInfo.layout.length; idx++) {
-        const item = lineInfo.layout[idx];
-        if (item.type === 'glyph') {
-          const g = item.g;
-          const w = g.w;
-          const h = lineInfo.height;
-
-          this.tintOff.width = w;
-          this.tintOff.height = h;
-          this.tintOffCtx.clearRect(0, 0, w, h);
-          this.tintOffCtx.drawImage(this.loader.spriteImg, g.sx, g.sy || 0, w, h, 0, 0, w, h);
-
-          const img = this.tintOffCtx.getImageData(0, 0, w, h);
-          const d = img.data;
-          const rgb = hexToRgb(selectedColor);
-
-          for (let pi = 0; pi < d.length; pi += 4) {
-            if (d[pi + 3] === 0) continue;
-            d[pi] = rgb.r;
-            d[pi + 1] = rgb.g;
-            d[pi + 2] = rgb.b;
-          }
-
-          this.tintOffCtx.putImageData(img, 0, 0);
-          tctx.drawImage(this.tintOff, 0, 0, w, h, x, yOffset, w, h);
-          x += w;
+    if (normColor !== '#000000' && normColor !== '#000') {
+      const rgb = hexToRgb(selectedColor);
+      // Create a copy to apply color
+      finalData = new Uint8Array(this.cleanData.length);
+      for (let i = 0; i < this.cleanData.length; i += 4) {
+        const a = this.cleanData[i + 3];
+        if (a > 0) {
+          // Visible: Apply selected color
+          finalData[i] = rgb.r;
+          finalData[i + 1] = rgb.g;
+          finalData[i + 2] = rgb.b;
+          finalData[i + 3] = 255;
         } else {
-          x += item.srcW || 0;
+          // Transparent: Keep as is (0,0,0,0)
+          finalData[i] = 0;
+          finalData[i + 1] = 0;
+          finalData[i + 2] = 0;
+          finalData[i + 3] = 0;
         }
-        if (idx < lineInfo.layout.length - 1) x += visualGap;
-      }
-
-      yOffset += lineInfo.height;
-      if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
-    }
-
-    const imgAll = tctx.getImageData(0, 0, tmp.width, tmp.height);
-    const dAll = imgAll.data;
-
-    // Final Pass: Ensure Strict Colors
-    // 1. Any pixel with Alpha > 0 must be PURE BLACK (0,0,0,255)
-    // 2. Any pixel with Alpha == 0 must be PURE TRANSPARENT (0,0,0,0)
-    for (let i = 0; i < dAll.length; i += 4) {
-      if (dAll[i + 3] > 0) {
-        // Visible (even slightly) -> Force Pure Black
-        dAll[i] = 0;
-        dAll[i + 1] = 0;
-        dAll[i + 2] = 0;
-        dAll[i + 3] = 255;
-      } else {
-        // Transparent -> Force Clear
-        dAll[i] = 0;
-        dAll[i + 1] = 0;
-        dAll[i + 2] = 0;
-        dAll[i + 3] = 0;
       }
     }
 
-    tctx.putImageData(imgAll, 0, 0);
-    return tmp.toDataURL('image/png');
+    console.log(`[Renderer] Encoding PNG directly from clean buffer (Color: ${selectedColor})...`);
+    const pngBytes = encodePNG(width, height, finalData);
+    const blob = new Blob([pngBytes], { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+
+    return url;
   }
 }
