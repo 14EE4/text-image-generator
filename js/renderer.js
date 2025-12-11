@@ -153,25 +153,34 @@ export class GlyphRenderer {
     const verifyCanvas = document.createElement('canvas');
     verifyCanvas.width = this.canvas.width;
     verifyCanvas.height = this.canvas.height;
-    // Attempting default context to avoid potential 'willReadFrequently' bugs on Linux
     const verifyCtx = verifyCanvas.getContext('2d');
 
-    // PRE-CHECK: Verify cleanData array in memory BEFORE touching any Canvas API
-    // This proves if our logic generated clean bytes.
+    // PRE-CHECK: Verify cleanData array in memory
     let preCheckFail = false;
     for (let i = 0; i < cleanData.length; i += 4) {
       if (cleanData[i + 3] === 0 && (cleanData[i] !== 0 || cleanData[i + 1] !== 0 || cleanData[i + 2] !== 0)) {
-        console.error(`[Renderer] Logic Error! cleanData dirty at index ${i / 4}:`, [cleanData[i], cleanData[i + 1], cleanData[i + 2], cleanData[i + 3]]);
+        console.error(`[Renderer] Logic Error! cleanData dirty at index ${i / 4}`);
         preCheckFail = true;
         break;
       }
     }
-    if (!preCheckFail) {
-      console.log(`[Renderer] cleanData (in-memory buffer) is 100% CLEAN.`);
-    }
+    if (!preCheckFail) console.log(`[Renderer] cleanData (in-memory buffer) is 100% CLEAN.`);
 
-    const newImageData = new ImageData(cleanData, this.canvas.width, this.canvas.height);
-    verifyCtx.putImageData(newImageData, 0, 0);
+    // ALTERNATIVE RENDER: "Vector Reconstruction"
+    // Since putImageData is causing artifacts on this browser, we reconstruct the image
+    // using purely standard drawing commands (fillRect), which use a different pipeline.
+    verifyCtx.clearRect(0, 0, verifyCanvas.width, verifyCanvas.height);
+    verifyCtx.fillStyle = '#000000';
+
+    // Iterate and draw only black pixels
+    for (let i = 0; i < cleanData.length; i += 4) {
+      if (cleanData[i + 3] > 0) { // If visible (we know it's black from cleanData logic)
+        const pIdx = i / 4;
+        const x = pIdx % verifyCanvas.width;
+        const y = Math.floor(pIdx / verifyCanvas.width);
+        verifyCtx.fillRect(x, y, 1, 1);
+      }
+    }
 
     // 4. Verify Internal Data Integrity
     let internalImg = verifyCtx.getImageData(0, 0, verifyCanvas.width, verifyCanvas.height);
@@ -181,7 +190,7 @@ export class GlyphRenderer {
     let internalFailCount = 0;
     let internalFirstFail = null;
     let internalFirstFailXY = null;
-    const badPixels = []; // Store coordinates of bad pixels
+    // const badPixels = []; // Store coordinates of bad pixels // No longer needed for brute force fix
 
     for (let i = 0; i < internalD.length; i += 4) {
       const r = internalD[i];
@@ -194,52 +203,10 @@ export class GlyphRenderer {
 
       if (isTransparentFail || isVisibleFail) {
         internalFailCount++;
-        badPixels.push({ x: (i / 4) % verifyingWidth, y: Math.floor((i / 4) / verifyingWidth) });
-      }
-    }
-
-    // 4.1 Brute Force Fix for Browser Bugs
-    // If putImageData left artifacts (e.g. 0,1,0,0), force-clear them with explicit putImageData
-    // clearRect might fail if the browser has compositing quirks, but putImageData should be exact.
-    if (internalFailCount > 0) {
-      console.warn(`[Renderer] Found ${internalFailCount} artifacts after putImageData. Attempting spot-repair with putImageData...`);
-
-      const onePixelTransparent = new ImageData(new Uint8ClampedArray([0, 0, 0, 0]), 1, 1);
-      const onePixelBlack = new ImageData(new Uint8ClampedArray([0, 0, 0, 255]), 1, 1);
-
-      for (const p of badPixels) {
-        // Check our cleanData source of truth
-        const srcIdx = (p.y * verifyingWidth + p.x) * 4;
-        if (cleanData[srcIdx + 3] === 0) {
-          verifyCtx.putImageData(onePixelTransparent, p.x, p.y);
-        } else {
-          verifyCtx.putImageData(onePixelBlack, p.x, p.y);
-        }
-      }
-
-      // 4.2 Re-verify
-      internalImg = verifyCtx.getImageData(0, 0, verifyingWidth, verifyingHeight);
-      internalD = internalImg.data;
-      internalFailCount = 0;
-      internalFirstFail = null;
-      internalFirstFailXY = null;
-
-      for (let i = 0; i < internalD.length; i += 4) {
-        const r = internalD[i];
-        const g = internalD[i + 1];
-        const b = internalD[i + 2];
-        const a = internalD[i + 3];
-
-        const isTransparentFail = (a === 0 && (r !== 0 || g !== 0 || b !== 0));
-        const isVisibleFail = (a > 0 && (a !== 255 || r !== 0 || g !== 0 || b !== 0));
-
-        if (isTransparentFail || isVisibleFail) {
-          internalFailCount++;
-          if (!internalFirstFail) {
-            internalFirstFail = [r, g, b, a];
-            const pxIdx = i / 4;
-            internalFirstFailXY = { x: pxIdx % verifyingWidth, y: Math.floor(pxIdx / verifyingWidth) };
-          }
+        if (!internalFirstFail) {
+          internalFirstFail = [r, g, b, a];
+          const pxIdx = i / 4;
+          internalFirstFailXY = { x: pxIdx % verifyingWidth, y: Math.floor(pxIdx / verifyingWidth) };
         }
       }
     }
