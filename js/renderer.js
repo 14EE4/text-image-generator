@@ -129,42 +129,67 @@ export class GlyphRenderer {
     const finalImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     const finalD = finalImg.data;
 
-    // 1. Clean data in-memory
+    // 2. Prepare Fresh Clean Buffer
+    // We create a new buffer to avoid any potential referencing issues with the original ImageData
+    const cleanData = new Uint8ClampedArray(finalD.length);
     for (let i = 0; i < finalD.length; i += 4) {
       if (finalD[i + 3] > 0) {
-        // Visible -> Pure Black
-        finalD[i] = 0;
-        finalD[i + 1] = 0;
-        finalD[i + 2] = 0;
-        finalD[i + 3] = 255;
+        // Visible -> Force Pure Black (0, 0, 0, 255)
+        cleanData[i] = 0;
+        cleanData[i + 1] = 0;
+        cleanData[i + 2] = 0;
+        cleanData[i + 3] = 255;
       } else {
-        // Transparent -> Clear
-        finalD[i] = 0;
-        finalD[i + 1] = 0;
-        finalD[i + 2] = 0;
-        finalD[i + 3] = 0;
+        // Transparent -> Force Clear (0, 0, 0, 0)
+        cleanData[i] = 0; // R
+        cleanData[i + 1] = 0; // G
+        cleanData[i + 2] = 0; // B
+        cleanData[i + 3] = 0; // A
       }
     }
 
-    // 2. Direct Write to Main Canvas
-    // Using putImageData ensures exact pixel values are preserved, 
-    // preventing any unexpected compositing or dithering artifacts.
-    this.ctx.putImageData(finalImg, 0, 0);
+    // 3. Clear and Update Main Canvas
+    // clearRect ensures the backing store is zeroed out before we write our strictly cleaned data
+    const newImageData = new ImageData(cleanData, this.canvas.width, this.canvas.height);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.putImageData(newImageData, 0, 0);
 
     // Verify immediately (Main Canvas)
     const checkImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     const checkD = checkImg.data;
     let failCount = 0;
     let firstFail = null;
+    let firstFailXY = null;
+    const width = this.canvas.width;
+
     for (let i = 0; i < checkD.length; i += 4) {
-      const a = checkD[i + 3];
       const r = checkD[i];
-      if ((a === 0 && (r || checkD[i + 1] || checkD[i + 2])) || (a > 0 && (r || checkD[i + 1] || checkD[i + 2] || a !== 255))) {
+      const g = checkD[i + 1];
+      const b = checkD[i + 2];
+      const a = checkD[i + 3];
+
+      // Condition: Alpha=0 must have RGB=0. Alpha!=0 must have Alpha=255 and RGB=0 (since we only draw black)
+      // Note: If we supported colored text, the R/G/B check for visible pixels would be different.
+      // But for now we are enforcing BLACK or TRANSPARENT.
+
+      const isTransparentFail = (a === 0 && (r !== 0 || g !== 0 || b !== 0));
+      const isVisibleFail = (a > 0 && (a !== 255 || r !== 0 || g !== 0 || b !== 0));
+
+      if (isTransparentFail || isVisibleFail) {
         failCount++;
-        if (!firstFail) firstFail = [r, checkD[i + 1], checkD[i + 2], a];
+        if (!firstFail) {
+          firstFail = [r, g, b, a];
+          const pxIdx = i / 4;
+          firstFailXY = { x: pxIdx % width, y: Math.floor(pxIdx / width) };
+        }
       }
     }
-    console.log(`[Renderer] Instant Self-Check: ${failCount} bad pixels. Sample:`, firstFail);
+
+    if (failCount > 0) {
+      console.warn(`[Renderer] Instant Self-Check: ${failCount} bad pixels. First fail at (${firstFailXY?.x}, ${firstFailXY?.y}):`, firstFail);
+    } else {
+      console.log(`[Renderer] Instant Self-Check: Passed (0 bad pixels).`);
+    }
 
     return { success: true, filename: sanitizeFilename(text) + '.png' };
   }
