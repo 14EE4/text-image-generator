@@ -153,7 +153,23 @@ export class GlyphRenderer {
     const verifyCanvas = document.createElement('canvas');
     verifyCanvas.width = this.canvas.width;
     verifyCanvas.height = this.canvas.height;
-    const verifyCtx = verifyCanvas.getContext('2d', { willReadFrequently: true });
+    // Attempting default context to avoid potential 'willReadFrequently' bugs on Linux
+    const verifyCtx = verifyCanvas.getContext('2d');
+
+    // PRE-CHECK: Verify cleanData array in memory BEFORE touching any Canvas API
+    // This proves if our logic generated clean bytes.
+    let preCheckFail = false;
+    for (let i = 0; i < cleanData.length; i += 4) {
+      if (cleanData[i + 3] === 0 && (cleanData[i] !== 0 || cleanData[i + 1] !== 0 || cleanData[i + 2] !== 0)) {
+        console.error(`[Renderer] Logic Error! cleanData dirty at index ${i / 4}:`, [cleanData[i], cleanData[i + 1], cleanData[i + 2], cleanData[i + 3]]);
+        preCheckFail = true;
+        break;
+      }
+    }
+    if (!preCheckFail) {
+      console.log(`[Renderer] cleanData (in-memory buffer) is 100% CLEAN.`);
+    }
+
     const newImageData = new ImageData(cleanData, this.canvas.width, this.canvas.height);
     verifyCtx.putImageData(newImageData, 0, 0);
 
