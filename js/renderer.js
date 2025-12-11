@@ -198,22 +198,26 @@ export class GlyphRenderer {
     const imgAll = tctx.getImageData(0, 0, tmp.width, tmp.height);
     const dAll = imgAll.data;
 
+    // Final Pass: Ensure Strict Colors
+    // 1. Any pixel with Alpha > 0 must be PURE BLACK (0,0,0,255)
+    // 2. Any pixel with Alpha == 0 must be PURE TRANSPARENT (0,0,0,0)
     for (let i = 0; i < dAll.length; i += 4) {
-      if (dAll[i + 3] === 255) {
-        // Fully opaque pixel – force pure black
+      if (dAll[i + 3] > 0) {
+        // Visible (even slightly) -> Force Pure Black
         dAll[i] = 0;
         dAll[i + 1] = 0;
         dAll[i + 2] = 0;
-        // alpha stays 255
+        dAll[i + 3] = 255;
       } else {
-        // Any non‑opaque pixel – make fully transparent and clear color
+        // Transparent -> Force Clear
         dAll[i] = 0;
         dAll[i + 1] = 0;
         dAll[i + 2] = 0;
         dAll[i + 3] = 0;
       }
-    } tctx.putImageData(imgAll, 0, 0);
+    }
+
+    tctx.putImageData(imgAll, 0, 0);
     return tmp.toDataURL('image/png');
   }
 }
-```
