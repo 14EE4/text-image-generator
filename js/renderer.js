@@ -124,10 +124,12 @@ export class GlyphRenderer {
       if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
     }
 
-    // Force strict pixel colors on the main canvas immediately after rendering.
-    // This ensures what you see on screen is also pure black/transparent.
+    // Force strict pixel colors using an intermediary offscreen buffer
+    // This bypasses potential noisy state in the main canvas context
     const finalImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     const finalD = finalImg.data;
+
+    // 1. Clean data in-memory
     for (let i = 0; i < finalD.length; i += 4) {
       if (finalD[i + 3] > 0) {
         // Visible -> Pure Black
@@ -143,19 +145,35 @@ export class GlyphRenderer {
         finalD[i + 3] = 0;
       }
     }
-    this.ctx.putImageData(finalImg, 0, 0);
 
-    // Verify immediately
+    // 2. Put into a fresh offscreen canvas (Software mode)
+    const cleanCanvas = document.createElement('canvas');
+    cleanCanvas.width = this.canvas.width;
+    cleanCanvas.height = this.canvas.height;
+    const cleanCtx = cleanCanvas.getContext('2d', { willReadFrequently: true });
+    cleanCtx.putImageData(finalImg, 0, 0);
+
+    // 3. Brutal Force Copy to Main Canvas
+    // 'copy' operation REPLACES pixels, ignoring blending
+    const oldGCO = this.ctx.globalCompositeOperation;
+    this.ctx.globalCompositeOperation = 'copy';
+    this.ctx.drawImage(cleanCanvas, 0, 0);
+    this.ctx.globalCompositeOperation = oldGCO;
+
+    // Verify immediately (Main Canvas)
     const checkImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     const checkD = checkImg.data;
     let failCount = 0;
+    let firstFail = null;
     for (let i = 0; i < checkD.length; i += 4) {
       const a = checkD[i + 3];
       const r = checkD[i];
-      if (a === 0 && (r !== 0 || checkD[i + 1] !== 0 || checkD[i + 2] !== 0)) failCount++;
-      else if (a > 0 && (r !== 0 || checkD[i + 1] !== 0 || checkD[i + 2] !== 0 || a !== 255)) failCount++;
+      if ((a === 0 && (r || checkD[i + 1] || checkD[i + 2])) || (a > 0 && (r || checkD[i + 1] || checkD[i + 2] || a !== 255))) {
+        failCount++;
+        if (!firstFail) firstFail = [r, checkD[i + 1], checkD[i + 2], a];
+      }
     }
-    console.log(`[Renderer] Instant Self-Check: ${failCount} bad pixels found after cleanup.`);
+    console.log(`[Renderer] Instant Self-Check: ${failCount} bad pixels. Sample:`, firstFail);
 
     return { success: true, filename: sanitizeFilename(text) + '.png' };
   }
