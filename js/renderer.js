@@ -192,8 +192,8 @@ export class GlyphRenderer {
     const dAll = imgAll.data;
 
     for (let i = 0; i < dAll.length; i += 4) {
-      // 1. Check alpha first. If it's effectively transparent, nuke it to 0,0,0,0
-      if (dAll[i + 3] < 10) { // Threshold for "transparent enough"
+      // 1. Check alpha first. If it's fully transparent, clear it completely.
+      if (dAll[i + 3] === 0) {
         dAll[i] = 0;
         dAll[i + 1] = 0;
         dAll[i + 2] = 0;
@@ -201,10 +201,7 @@ export class GlyphRenderer {
         continue;
       }
 
-      // 2. If it's visible, FORCE the RGB to be exactly the selected color.
-      // AND FORCE ALPHA TO 255 (Fully Opaque) to prevent browser premultiplication artifacts.
-      // This sacrifices anti-aliasing for color precision, which is preferred for pixel art.
-      // Force pure black and full opacity for all visible pixels
+      // 2. For any visible pixel, force pure black with full opacity.
       dAll[i] = 0;
       dAll[i + 1] = 0;
       dAll[i + 2] = 0;
