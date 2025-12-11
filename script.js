@@ -81,28 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const result = renderer.render(text, options);
 
-    // Post‑process: ensure every pixel is pure black (0,0,0) and fully opaque for visible pixels,
-    // and clear RGB for fully transparent pixels.
-    if (result.success) {
-      const imgData = renderer.ctx.getImageData(0, 0, renderer.canvas.width, renderer.canvas.height);
-      const d = imgData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] > 0) {
-          // Visible pixel (any alpha) – force pure black and full opacity.
-          d[i] = 0;
-          d[i + 1] = 0;
-          d[i + 2] = 0;
-          d[i + 3] = 255;
-        } else {
-          // Fully transparent pixel – clear all channels
-          d[i] = 0;
-          d[i + 1] = 0;
-          d[i + 2] = 0;
-          d[i + 3] = 0;
-        }
-      }
-      renderer.ctx.putImageData(imgData, 0, 0);
-    }
+    // Post-process is now handled inside renderer.render() to ensure consistency.
 
     if (result.success) {
       downloadLink.href = renderer.getTransparentDataURL(250, '#000000');

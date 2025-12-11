@@ -123,6 +123,27 @@ export class GlyphRenderer {
       if (lineIdx < lineLayouts.length - 1) yOffset += lineGap;
     }
 
+    // Force strict pixel colors on the main canvas immediately after rendering.
+    // This ensures what you see on screen is also pure black/transparent.
+    const finalImg = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    const finalD = finalImg.data;
+    for (let i = 0; i < finalD.length; i += 4) {
+      if (finalD[i + 3] > 0) {
+        // Visible -> Pure Black
+        finalD[i] = 0;
+        finalD[i + 1] = 0;
+        finalD[i + 2] = 0;
+        finalD[i + 3] = 255;
+      } else {
+        // Transparent -> Clear
+        finalD[i] = 0;
+        finalD[i + 1] = 0;
+        finalD[i + 2] = 0;
+        finalD[i + 3] = 0;
+      }
+    }
+    this.ctx.putImageData(finalImg, 0, 0);
+
     return { success: true, filename: sanitizeFilename(text) + '.png' };
   }
 
